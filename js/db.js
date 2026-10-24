@@ -45,6 +45,37 @@ export function watchMeals(date, onData, onError) {
   );
 }
 
+// ---- レシピ: { name, servings, items:[{foodId, source, name, grams, n}] } ----
+export function watchRecipes(onData, onError) {
+  return fs.onSnapshot(
+    col("recipes"),
+    (snap) =>
+      onData(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => String(a.name).localeCompare(String(b.name), "ja"))
+      ),
+    onError
+  );
+}
+
+export async function getRecipe(id) {
+  const snap = await fs.getDoc(fs.doc(col("recipes"), id));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+// id が null なら新規作成。IDを先に確定するので、オフライン時もすぐ { id } が得られる。
+export function saveRecipe(id, data) {
+  const ref = id ? fs.doc(col("recipes"), id) : fs.doc(col("recipes"));
+  const stamp = id ? {} : { createdAt: fs.serverTimestamp() };
+  const done = fs.setDoc(ref, { ...data, ...stamp, updatedAt: fs.serverTimestamp() }, { merge: true });
+  return { id: ref.id, done };
+}
+
+export async function deleteRecipe(id) {
+  return fs.deleteDoc(fs.doc(col("recipes"), id));
+}
+
 // 目標値(未設定の項目は初期値で補う)
 export async function getGoals(defaults) {
   const snap = await fs.getDoc(fs.doc(col("settings"), "goals"));

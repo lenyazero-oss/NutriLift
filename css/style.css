@@ -139,6 +139,30 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 }
 .add-btn { min-height: 44px; font-size: 16px; text-align: center; text-decoration: none; line-height: 24px; }
 
+/* レシピ */
+.recipe .btn { margin-top: 10px; }
+.recipe .meal-sub { margin-top: 2px; }
+.edit-link {
+  min-height: 44px; min-width: 56px; display: flex; align-items: center; justify-content: center;
+  color: var(--green-dark); font-weight: 600; text-decoration: none;
+}
+.adjust { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eef1ef; }
+.stepper { display: flex; gap: 8px; }
+.stepper input { flex: 1; min-width: 0; text-align: center; margin: 0; }
+.step-btn {
+  width: 56px; min-height: 48px; font-size: 24px; background: #fff;
+  border: 1px solid var(--border); border-radius: 10px; color: var(--text);
+}
+/* 食材行: 名前を1段目、グラム入力と「外す」を2段目に置く(狭い画面でも窮屈にならない) */
+.item { flex-wrap: wrap; }
+.item .meal-main { flex: 1 1 100%; }
+.item .g-input { margin-left: auto; }
+.g-input { width: 96px; flex: none; margin: 0; text-align: right; }
+.slot-head h2 { min-width: 0; overflow-wrap: anywhere; }
+.unit { color: #55615d; }
+.btn-danger { margin-top: 24px; color: var(--danger); border-color: #f0c9c4; }
+.card .meals { margin-bottom: 12px; }
+
 form .btn { margin-top: 10px; }
 form .btn-link { margin: 6px auto 0; }
 

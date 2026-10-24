@@ -1,7 +1,10 @@
 // 静的ファイルのキャッシュ(オフライン起動用)。更新時は VERSION を上げる。
 // 注意: ファイルを追加したら ASSETS にも追記すること(1つでも404だとインストールが失敗する)。
-const VERSION = "v7";
+const VERSION = "v9";
 const CACHE = `meal-app-${VERSION}`;
+// Firebase SDK(バージョン固定)用。アプリの更新(VERSION)では削除しない。SDKを更新したら名前を変える。
+const SDK_CACHE = "meal-sdk-v1";
+const NETWORK_TIMEOUT_MS = 4000;
 const ASSETS = [
   "./",
   "./index.html",
@@ -17,6 +20,9 @@ const ASSETS = [
   "./js/views/login.js",
   "./js/views/add.js",
   "./js/views/today.js",
+  "./js/views/recipes.js",
+  "./js/views/recipe-edit.js",
+  "./js/food-picker.js",
   "./js/db.js",
   "./js/foods.js",
   "./js/nutrients.js",
@@ -31,13 +37,35 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== SDK_CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
-// 同一オリジンのGETのみ: ネットワーク優先(HTTPキャッシュを使わず常に最新を確認)、
-// 失敗時にキャッシュ。ページ遷移のみ index.html にフォールバックする。
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
+}
+
+// ネットワーク優先(HTTPキャッシュを使わず常に最新を確認)。
+// キャッシュがあるときは、通信が遅い場合に数秒でキャッシュへ切り替える。
+// ページ遷移のみ、見つからなければ index.html にフォールバックする。
+async function networkFirst(e, req) {
+  const cached = await caches.match(req);
+  try {
+    const request = fetch(req, { cache: "no-cache" });
+    const res = await (cached ? withTimeout(request, NETWORK_TIMEOUT_MS) : request);
+    if (res.ok && res.type === "basic") {
+      const copy = res.clone();
+      e.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {}));
+    }
+    return res;
+  } catch {
+    if (cached) return cached;
+    if (req.mode === "navigate") return caches.match("./index.html");
+    return Response.error();
+  }
+}
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   const url = new URL(req.url);
@@ -52,7 +80,7 @@ self.addEventListener("fetch", (e) => {
           fetch(req).then((res) => {
             if (res.ok) {
               const copy = res.clone();
-              e.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {}));
+              e.waitUntil(caches.open(SDK_CACHE).then((c) => c.put(req, copy)).catch(() => {}));
             }
             return res;
           })
@@ -62,20 +90,5 @@ self.addEventListener("fetch", (e) => {
   }
 
   if (url.origin !== location.origin) return;
-  e.respondWith(
-    fetch(req, { cache: "no-cache" })
-      .then((res) => {
-        if (res.ok && res.type === "basic") {
-          const copy = res.clone();
-          e.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {}));
-        }
-        return res;
-      })
-      .catch(async () => {
-        const cached = await caches.match(req);
-        if (cached) return cached;
-        if (req.mode === "navigate") return caches.match("./index.html");
-        return Response.error();
-      })
-  );
+  e.respondWith(networkFirst(e, req));
 });

@@ -2,6 +2,8 @@ import { isConfigured } from "./firebase.js";
 import { onAuth, checkRedirectResult, authErrorMessage } from "./auth.js";
 import { registerRoute, initRouter, render, resetView, setRouterEnabled } from "./router.js";
 import { renderToday } from "./views/today.js";
+import { renderRecipes } from "./views/recipes.js";
+import { renderRecipeEdit } from "./views/recipe-edit.js";
 import { renderLogin } from "./views/login.js";
 import { renderAdd } from "./views/add.js";
 import { el, hideToast } from "./ui.js";
@@ -19,7 +21,8 @@ function placeholder(title, tab) {
 }
 registerRoute("today", { tab: "today", render: renderToday });
 registerRoute("add", { tab: "today", render: renderAdd });
-registerRoute("recipes", placeholder("レシピ", "recipes"));
+registerRoute("recipes", { tab: "recipes", render: renderRecipes });
+registerRoute("recipe", { tab: "recipes", render: renderRecipeEdit });
 registerRoute("history", placeholder("履歴", "history"));
 registerRoute("settings", placeholder("設定", "settings"));
 

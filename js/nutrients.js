@@ -41,6 +41,21 @@ export function sumNutrients(meals) {
   return total;
 }
 
+// レシピの全体の栄養素(items の n は100gあたり、grams は使用量)
+export function recipeTotals(items) {
+  return sumNutrients(items.map((it) => ({ nutrients: scale(it.n || {}, it.grams) })));
+}
+
+// 全体を「全体の人前数」で割り、portions 人前分にした栄養素と重さ
+export function recipePortion(recipe, portions) {
+  const ratio = portions / (recipe.servings || 1);
+  const total = recipeTotals(recipe.items || []);
+  const nutrients = {};
+  for (const [k, v] of Object.entries(total)) nutrients[k] = Math.round(v * ratio * 100) / 100;
+  const grams = (recipe.items || []).reduce((s, it) => s + (Number(it.grams) || 0), 0) * ratio;
+  return { nutrients, grams: Math.round(grams * 10) / 10 };
+}
+
 export function formatValue(def, value) {
   const v = Number(value) || 0;
   return `${v.toFixed(def.decimals)}${def.unit}`;
