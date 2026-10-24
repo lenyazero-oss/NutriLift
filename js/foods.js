@@ -42,6 +42,10 @@ export function setUserData({ customFoods = [], unitOverrides = {} }) {
   overrides = unitOverrides;
 }
 
+export function findFood(id, source) {
+  return foods.find((f) => f.id === id && f.source === source) || null;
+}
+
 // 成分表の食品名はかな書き・学術名寄り(例: 「にわとり [若どり・主品目] むね」)のため、
 // 一般的な呼び名との対応表を持つ。同じグループの語はどれで検索しても同じ意味として扱う。
 const ALIAS_GROUPS = [

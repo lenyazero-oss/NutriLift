@@ -5,27 +5,23 @@ import { renderToday } from "./views/today.js";
 import { renderRecipes } from "./views/recipes.js";
 import { renderRecipeEdit } from "./views/recipe-edit.js";
 import { renderHistory } from "./views/history.js";
+import { renderSettings } from "./views/settings.js";
+import { renderFoodMaster } from "./views/foodmaster.js";
+import { renderFoodEdit } from "./views/foodedit.js";
 import { renderLogin } from "./views/login.js";
 import { renderAdd } from "./views/add.js";
 import { el, hideToast } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
 
-// 画面は順次実装する。未実装の画面は仮表示にしておく。
-function placeholder(title, tab) {
-  return {
-    tab,
-    render(root) {
-      root.append(el("h1", {}, title), el("p", { class: "hint" }, "このあと実装します。"));
-    },
-  };
-}
 registerRoute("today", { tab: "today", render: renderToday });
 registerRoute("add", { tab: "today", render: renderAdd });
 registerRoute("recipes", { tab: "recipes", render: renderRecipes });
 registerRoute("recipe", { tab: "recipes", render: renderRecipeEdit });
 registerRoute("history", { tab: "history", render: renderHistory });
-registerRoute("settings", placeholder("設定", "settings"));
+registerRoute("settings", { tab: "settings", render: renderSettings });
+registerRoute("foodmaster", { tab: "settings", render: renderFoodMaster });
+registerRoute("foodedit", { tab: "settings", render: renderFoodEdit });
 
 function showScreen(name) {
   $("splash").hidden = name !== "splash";

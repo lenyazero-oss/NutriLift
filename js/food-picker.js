@@ -5,15 +5,20 @@ import { listCustomFoods, getUnitOverrides } from "./db.js";
 
 // 自作食材・単位の読み込みは1回だけ(失敗時は次回やり直す)。食材マスタを編集したら invalidate すること。
 let userDataPromise = null;
+let generation = 0; // 古い取得が後から終わって新しい結果を上書きしないための世代番号
 export function invalidateUserData() {
   userDataPromise = null;
+  generation++;
 }
-function ensureUserData() {
+export function ensureUserData() {
   if (!userDataPromise) {
+    const gen = generation;
     userDataPromise = Promise.all([listCustomFoods(), getUnitOverrides()])
-      .then(([customFoods, unitOverrides]) => setUserData({ customFoods, unitOverrides }))
+      .then(([customFoods, unitOverrides]) => {
+        if (gen === generation) setUserData({ customFoods, unitOverrides });
+      })
       .catch((e) => {
-        userDataPromise = null;
+        if (gen === generation) userDataPromise = null;
         throw e;
       });
   }

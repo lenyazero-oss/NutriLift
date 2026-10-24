@@ -103,6 +103,28 @@ export async function listCustomFoods() {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+// 自作食材: { name, n:{kcal,protein,...}(100gあたり), units:[{name,g}] }。id が null なら新規作成。
+export function saveCustomFood(id, data) {
+  const ref = id ? fs.doc(col("customFoods"), id) : fs.doc(col("customFoods"));
+  const stamp = id ? {} : { createdAt: fs.serverTimestamp() };
+  const done = fs.setDoc(ref, { ...data, ...stamp, updatedAt: fs.serverTimestamp() }, { merge: true });
+  return { id: ref.id, done };
+}
+
+export async function deleteCustomFood(id) {
+  return fs.deleteDoc(fs.doc(col("customFoods"), id));
+}
+
+// 成分表の食材の単位の上書き。units が空配列なら「単位なし」として保存する。
+export function saveUnitOverride(foodId, units) {
+  return fs.setDoc(fs.doc(col("unitOverrides"), foodId), { units, updatedAt: fs.serverTimestamp() });
+}
+
+// 上書きを消して初期値に戻す
+export async function deleteUnitOverride(foodId) {
+  return fs.deleteDoc(fs.doc(col("unitOverrides"), foodId));
+}
+
 // { [foodId]: [{name, g}] }
 export async function getUnitOverrides() {
   const snap = await fs.getDocs(col("unitOverrides"));
