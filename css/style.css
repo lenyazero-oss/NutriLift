@@ -204,7 +204,9 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 .slot-head h2 { min-width: 0; overflow-wrap: anywhere; }
 .unit { color: var(--text-sub); }
 .btn-danger { margin-top: 24px; color: var(--danger); border-color: var(--danger-border); }
+.btn-danger.btn-far { margin-top: 56px; } /* 誤タップ防止の余白(.btn-danger より後ろで優先させる) */
 .card .meals { margin-bottom: 12px; }
+.account-email { overflow-wrap: anywhere; }
 
 form .btn { margin-top: 10px; }
 form .btn-link { margin: 6px auto 0; }

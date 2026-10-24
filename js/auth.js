@@ -62,6 +62,15 @@ export function currentUid() {
   return auth.currentUser ? auth.currentUser.uid : null;
 }
 
+// 設定画面の表示用。未ログインなら null。method は "google" / "password" / "other"
+export function currentUserInfo() {
+  const user = auth.currentUser;
+  if (!user) return null;
+  const ids = (user.providerData || []).map((p) => p.providerId);
+  const method = ids.includes("google.com") ? "google" : ids.includes("password") ? "password" : "other";
+  return { email: user.email || "", method };
+}
+
 // エラーコードを日本語メッセージに変換
 export function authErrorMessage(e) {
   const map = {

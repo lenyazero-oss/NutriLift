@@ -1,6 +1,19 @@
 // 設定: テーマの選択、食材マスタへの入口、ログアウト
 import { el, toast } from "../ui.js";
-import { signOut } from "../auth.js";
+import { signOut, currentUserInfo } from "../auth.js";
+
+const METHOD_LABEL = { google: "Googleでログイン中", password: "メールアドレスでログイン中", other: "ログイン中(方式不明)" };
+
+// ログイン中のアカウントの表示。方式ごとにデータが別になる点も添える
+function accountCard() {
+  const info = currentUserInfo();
+  if (!info) return null;
+  return el("section", { class: "card" },
+    el("h2", {}, "アカウント"),
+    el("p", {}, METHOD_LABEL[info.method]),
+    info.email ? el("p", { class: "hint account-email" }, info.email) : null,
+    el("p", { class: "hint" }, "Googleとメールのログインはデータが別々です。別の方法でログインすると記録が見えなくなります(消えてはいません)。いつも同じ方法でログインしてください。"));
+}
 
 // 色見本。data-theme を付けた要素の中では、そのテーマのトークンで描画される
 function swatch(themeId) {
@@ -50,10 +63,6 @@ function themePicker() {
 export function renderSettings(root) {
   root.append(
     el("h1", {}, "設定"),
-    el("section", { class: "card" },
-      el("h2", {}, "テーマ"),
-      el("p", { class: "hint" }, "タップするとすぐに切り替わります。この端末だけの設定です。"),
-      themePicker()),
     el("ul", { class: "list" },
       el("li", {}, el("a", { class: "list-item", href: "#/goals" },
         el("span", { class: "name" }, "目標値"),
@@ -61,10 +70,16 @@ export function renderSettings(root) {
       el("li", {}, el("a", { class: "list-item", href: "#/foodmaster" },
         el("span", { class: "name" }, "食材マスタ"),
         el("span", { class: "meta" }, "食材の単位(個・杯など)の設定と、自作食材の登録")))),
+    el("section", { class: "card" },
+      el("h2", {}, "テーマ"),
+      el("p", { class: "hint" }, "タップするとすぐに切り替わります。この端末だけの設定です。"),
+      themePicker()),
+    ...[accountCard()].filter(Boolean),
     el("button", {
       type: "button", class: "btn btn-danger btn-far",
       onclick: () => {
-        if (!confirm("ログアウトしますか?")) return;
+        const email = currentUserInfo()?.email;
+        if (!confirm(email ? `${email} をログアウトしますか?` : "ログアウトしますか?")) return;
         signOut().catch(() => toast("ログアウトできませんでした。", { error: true }));
       },
     }, "ログアウト"));
