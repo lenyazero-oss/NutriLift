@@ -3,7 +3,16 @@
 自炊した食事を記録し、たんぱく質を中心に栄養素の達成度を確認する、個人用のiPhone向けPWAです。
 GitHub Pages + Firebase(Spark プラン)で無料運用します。ビルド不要の静的サイトです。
 
-> 実装状況: ステップ1(土台+認証)まで完了。以降は順次追加します。
+> 実装状況: ステップ6まで完了。
+>
+> | ステップ | 内容 |
+> |---|---|
+> | 1 | 土台 + 認証(Google / メール) |
+> | 2 | 成分表データ(foods.json)の変換 |
+> | 3 | 今日の画面(達成バー、朝・昼・夜・間食の記録) |
+> | 4 | レシピの作成・編集 |
+> | 5 | 履歴画面(7日間の棒グラフ、日ごとの合計) |
+> | 6 | 設定画面と食材マスタ(単位の設定、自作食材) |
 
 ## 1. Firebase コンソールでの作業
 
@@ -55,8 +64,10 @@ python -m http.server 8000
 index.html / manifest.json / sw.js / firestore.rules
 css/style.css
 icons/
-js/  firebase-config.js firebase.js auth.js router.js ui.js app.js
-js/views/  login.js (ほかは順次追加)
+js/  firebase-config.js firebase.js auth.js router.js ui.js app.js db.js foods.js food-picker.js nutrients.js util.js
+js/views/  login.js today.js add.js recipes.js recipe-edit.js history.js settings.js foodmaster.js foodedit.js
+data/  foods.json default-units.json
+tools/convert_foods.py
 ```
 
 ## 成分表の変換(Excel → foods.json)
@@ -92,4 +103,8 @@ python tools/convert_foods.py data/成分表.xlsx --extra calcium,iron,zinc
 対応: `calcium` `iron` `zinc` `magnesium` `vitaminB6` `vitaminD`。出力後、`js/nutrients.js` の該当項目の `shown` を `true` にすると画面に表示されます。
 
 ### 単位の初期値
-`data/default-units.json` に、卵・米・鶏むね肉などの単位(個・杯・枚など)の初期値を入れています。目安の値です。食材ごとにアプリから上書きできます(食材マスタ画面はステップ6で追加)。
+`data/default-units.json` に、卵・米・鶏むね肉などの単位(個・杯・枚など)の初期値を入れています。目安の値です。食材ごとにアプリから上書きできます(設定 > 食材マスタ)。
+
+- 成分表の食材は、単位だけ変更できます。「初期値に戻す」で上書きを消せます。
+- 一度保存すると、その時点の単位の一覧が丸ごと固定されます。あとから `default-units.json` を更新しても、保存済みの食材には反映されません。
+- 成分表にない食品は、食材マスタの「自作食材」で名前・100gあたりの栄養素・単位を登録できます(エネルギーとたんぱく質は必須)。
