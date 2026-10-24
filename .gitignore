@@ -1,0 +1,17 @@
+# Claude関連(公開不要)
+CLAUDE.md
+.claude/
+
+# 作業用ドキュメント
+docs/
+
+# 削除用の退避フォルダ
+trash/
+
+# 成分表のExcel(変換後の data/foods.json があれば公開不要)
+data/*.xlsx
+data/*.xls
+
+# OS・エディタ
+.DS_Store
+Thumbs.db
