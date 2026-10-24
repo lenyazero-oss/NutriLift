@@ -118,7 +118,7 @@ export function renderHistory(root, { query }) {
         type: "button", class: `seg${d.key === key ? " on" : ""}`, "aria-pressed": String(d.key === key),
         onclick: () => {
           key = d.key;
-          history.replaceState(null, "", path(end)); // 再読み込みしても選択を保つ(hashchangeは発生しない)
+          history.replaceState(history.state, "", path(end)); // state(履歴番号)を保つ // 再読み込みしても選択を保つ(hashchangeは発生しない)
           draw();
         },
       }, d.label)));

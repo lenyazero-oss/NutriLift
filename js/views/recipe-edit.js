@@ -3,12 +3,13 @@ import { el, toast } from "../ui.js";
 import { createFoodPicker } from "../food-picker.js";
 import { unitsFor } from "../foods.js";
 import { getRecipe, saveRecipe, deleteRecipe } from "../db.js";
-import { navigate } from "../router.js";
+import { navigate, setLeaveGuard } from "../router.js";
 import { recipePortion } from "../nutrients.js";
 
 export function renderRecipeEdit(root, { args }) {
   const id = args[0] && args[0] !== "new" ? args[0] : null;
   let alive = true;
+  let leaving = false; // 保存・削除のあとは確認なしで移動する
 
   root.append(el("a", { class: "back", href: "#/recipes" }, "← レシピ一覧"), el("p", { class: "hint" }, "読み込み中…"));
 
@@ -148,6 +149,7 @@ export function renderRecipeEdit(root, { args }) {
         return;
       }
       toast("レシピを保存しました");
+      leaving = true;
       navigate("#/recipes");
     });
 
@@ -169,6 +171,7 @@ export function renderRecipeEdit(root, { args }) {
           if (!confirm(`「${recipe.name}」を削除しますか?\n(記録済みの食事は消えません)`)) return;
           deleteRecipe(id).catch(() => toast("削除できませんでした。", { error: true }));
           toast("レシピを削除しました");
+          leaving = true;
           navigate("#/recipes");
         },
       }, "このレシピを削除"));
@@ -176,6 +179,12 @@ export function renderRecipeEdit(root, { args }) {
     root.replaceChildren(...children);
     drawItems();
     updateTotals();
+
+    // 未保存の変更があるまま画面を離れようとしたら確認する(リンク・下部タブ・戻る操作のどれでも)。
+    // 開いた時点との比較なので、元の値に戻した場合は確認しない。食材検索欄への入力は変更に数えない。
+    const snapshot = () => JSON.stringify([nameInput.value.trim(), servings(), items.map((it) => [it.foodId, it.grams])]);
+    const initial = snapshot();
+    setLeaveGuard(() => leaving || snapshot() === initial || confirm("変更が保存されていません。保存せずに移動しますか?\n(OKを押すと入力した内容は破棄されます)"));
   }
 
   return () => { alive = false; };
