@@ -1,9 +1,10 @@
 import { isConfigured } from "./firebase.js";
 import { onAuth, checkRedirectResult, authErrorMessage } from "./auth.js";
-import { registerRoute, initRouter, render } from "./router.js";
+import { registerRoute, initRouter, render, resetView, setRouterEnabled } from "./router.js";
+import { renderToday } from "./views/today.js";
 import { renderLogin } from "./views/login.js";
 import { renderAdd } from "./views/add.js";
-import { el } from "./ui.js";
+import { el, hideToast } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -16,17 +17,7 @@ function placeholder(title, tab) {
     },
   };
 }
-// 今日の画面はステップ3で実装(それまでは食事追加への入口のみ)
-registerRoute("today", {
-  tab: "today",
-  render(root) {
-    root.append(
-      el("h1", {}, "今日"),
-      el("a", { class: "btn btn-big btn-primary", href: "#/add" }, "＋ 食事を追加"),
-      el("p", { class: "hint" }, "記録の一覧と達成バーは次のステップで実装します。")
-    );
-  },
-});
+registerRoute("today", { tab: "today", render: renderToday });
 registerRoute("add", { tab: "today", render: renderAdd });
 registerRoute("recipes", placeholder("レシピ", "recipes"));
 registerRoute("history", placeholder("履歴", "history"));
@@ -47,10 +38,13 @@ function handleAuthChange(user) {
     if (user.uid === currentUid) return;
     currentUid = user.uid;
     showScreen("app");
+    setRouterEnabled(true);
     render();
   } else {
     currentUid = null;
-    $("view").replaceChildren(); // 前ユーザーの画面を残さない
+    setRouterEnabled(false);
+    hideToast();
+    resetView(); // 前ユーザーの画面と監視を残さない
     renderLogin($("login-screen"), { configured: true, initialError: redirectError });
     redirectError = "";
     showScreen("login");

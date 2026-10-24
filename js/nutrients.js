@@ -30,6 +30,17 @@ export function scale(n, grams) {
   return out;
 }
 
+// 食事記録(nutrients スナップショット)の合計
+export function sumNutrients(meals) {
+  const total = {};
+  for (const m of meals) {
+    for (const [k, v] of Object.entries(m.nutrients || {})) {
+      if (Number.isFinite(v)) total[k] = (total[k] || 0) + v;
+    }
+  }
+  return total;
+}
+
 export function formatValue(def, value) {
   const v = Number(value) || 0;
   return `${v.toFixed(def.decimals)}${def.unit}`;

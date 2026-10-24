@@ -15,11 +15,21 @@ export function el(tag, attrs = {}, ...children) {
 }
 
 let toastTimer = null;
+// ログアウト時などに、取り消しボタン付きのトーストを残さない
+export function hideToast() {
+  const t = document.getElementById("toast");
+  t.hidden = true;
+  clearTimeout(toastTimer);
+}
+
 // action: { label, onClick } を渡すと「元に戻す」などのボタンを表示する
 export function toast(message, { action, duration = 2500, error = false } = {}) {
   const t = document.getElementById("toast");
   t.replaceChildren(el("span", {}, message));
   t.classList.toggle("toast-error", error);
+  // 入力中はキーボードに隠れないよう上部、それ以外は親指の届く下部に出す
+  const typing = ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName);
+  t.classList.toggle("toast-top", typing);
   if (action) {
     t.append(el("button", {
       type: "button", class: "toast-action",

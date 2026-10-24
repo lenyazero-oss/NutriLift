@@ -32,8 +32,25 @@ function parse() {
   };
 }
 
+// 画面が返した後片付け関数(Firestoreの監視解除など)を保持する
+let cleanup = null;
+
+export function resetView() {
+  if (cleanup) cleanup();
+  cleanup = null;
+  if (container) container.replaceChildren();
+}
+
+// ログイン中のみ画面を描画する(未ログイン時の hashchange で Firestore を触らないため)
+let enabled = false;
+export function setRouterEnabled(value) {
+  enabled = value;
+}
+
 export function render() {
-  if (!container) return;
+  if (!container || !enabled) return;
+  if (cleanup) cleanup();
+  cleanup = null;
   const { name, args, query } = parse();
   const known = name in routes;
   const route = known ? routes[name] : routes.today;
@@ -46,5 +63,6 @@ export function render() {
   });
   container.replaceChildren();
   window.scrollTo(0, 0);
-  route.render(container, { args, query });
+  const result = route.render(container, { args, query });
+  if (typeof result === "function") cleanup = result;
 }
