@@ -80,7 +80,8 @@ export function renderLogin(root, { configured, initialError }) {
     doLogin();
   });
 
-  root.append(
+  // append に null を渡すと「null」という文字が出るため、存在するものだけ渡す
+  root.append(...[
     el("h1", {}, "NutriLift"),
     el("p", { class: "sub" }, "たんぱく質を中心に、毎日の栄養を記録します"),
     configured ? null : el("p", { class: "error" },
@@ -88,6 +89,6 @@ export function renderLogin(root, { configured, initialError }) {
     msgBox,
     el("section", { class: "card" }, googleBtn,
       el("p", { class: "hint" }, "ホーム画面から開いてGoogleログインに失敗する場合は、下のメールログインを使ってください。")),
-    form
-  );
+    form,
+  ].filter(Boolean));
 }

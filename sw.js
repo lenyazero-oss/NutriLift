@@ -1,6 +1,6 @@
 // 静的ファイルのキャッシュ(オフライン起動用)。更新時は VERSION を上げる。
 // 注意: ファイルを追加したら ASSETS にも追記すること(1つでも404だとインストールが失敗する)。
-const VERSION = "v6";
+const VERSION = "v7";
 const CACHE = `meal-app-${VERSION}`;
 const ASSETS = [
   "./",

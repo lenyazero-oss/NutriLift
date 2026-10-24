@@ -91,8 +91,9 @@ export function renderToday(root, { query }) {
   }
 
   function drawList() {
+    // replaceChildren は配列を受け取れないため、スプレッドで展開して渡す
     list.replaceChildren(
-      SLOTS.map((s) => {
+      ...SLOTS.map((s) => {
         const items = meals.filter((m) => m.slot === s.key);
         const t = sumNutrients(items);
         return el("section", { class: "card slot" },
@@ -107,7 +108,8 @@ export function renderToday(root, { query }) {
 
   const redraw = () => { drawSummary(); drawList(); };
 
-  root.append(nav, toTodayLink, notice, summary, list);
+  // append に null を渡すと「null」という文字が出るため、存在するものだけ渡す
+  root.append(...[nav, toTodayLink, notice, summary, list].filter(Boolean));
   redraw();
 
   const unwatch = watchMeals(
