@@ -81,7 +81,7 @@ export function renderLogin(root, { configured, initialError }) {
   });
 
   root.append(
-    el("h1", {}, "筋トレ食事記録"),
+    el("h1", {}, "NutriLift"),
     el("p", { class: "sub" }, "たんぱく質を中心に、毎日の栄養を記録します"),
     configured ? null : el("p", { class: "error" },
       "Firebaseの設定が未入力です。js/firebase-config.js を編集してください。"),

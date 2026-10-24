@@ -2,6 +2,7 @@ import { isConfigured } from "./firebase.js";
 import { onAuth, checkRedirectResult, authErrorMessage } from "./auth.js";
 import { registerRoute, initRouter, render } from "./router.js";
 import { renderLogin } from "./views/login.js";
+import { renderAdd } from "./views/add.js";
 import { el } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
@@ -15,7 +16,18 @@ function placeholder(title, tab) {
     },
   };
 }
-registerRoute("today", placeholder("今日", "today"));
+// 今日の画面はステップ3で実装(それまでは食事追加への入口のみ)
+registerRoute("today", {
+  tab: "today",
+  render(root) {
+    root.append(
+      el("h1", {}, "今日"),
+      el("a", { class: "btn btn-big btn-primary", href: "#/add" }, "＋ 食事を追加"),
+      el("p", { class: "hint" }, "記録の一覧と達成バーは次のステップで実装します。")
+    );
+  },
+});
+registerRoute("add", { tab: "today", render: renderAdd });
 registerRoute("recipes", placeholder("レシピ", "recipes"));
 registerRoute("history", placeholder("履歴", "history"));
 registerRoute("settings", placeholder("設定", "settings"));

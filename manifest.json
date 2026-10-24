@@ -1,6 +1,6 @@
 {
-  "name": "筋トレ食事記録",
-  "short_name": "食事記録",
+  "name": "NutriLift",
+  "short_name": "NutriLift",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

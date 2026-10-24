@@ -10,6 +10,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig, isConfigured } from "./firebase-config.js";
 
+// Firestoreの関数は db.js などからここ経由で使う(CDNのURLを1か所にまとめるため)
+export * as fs from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 export { isConfigured };
 export const FIREBASE_VERSION = "10.12.2";
 

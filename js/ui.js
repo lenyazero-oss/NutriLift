@@ -15,10 +15,18 @@ export function el(tag, attrs = {}, ...children) {
 }
 
 let toastTimer = null;
-export function toast(message) {
+// action: { label, onClick } を渡すと「元に戻す」などのボタンを表示する
+export function toast(message, { action, duration = 2500, error = false } = {}) {
   const t = document.getElementById("toast");
-  t.textContent = message;
+  t.replaceChildren(el("span", {}, message));
+  t.classList.toggle("toast-error", error);
+  if (action) {
+    t.append(el("button", {
+      type: "button", class: "toast-action",
+      onclick: () => { t.hidden = true; clearTimeout(toastTimer); action.onClick(); },
+    }, action.label));
+  }
   t.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.hidden = true), 2500);
+  toastTimer = setTimeout(() => (t.hidden = true), action ? Math.max(duration, 6000) : duration);
 }
