@@ -6,6 +6,8 @@ import { dateStr, shiftDate, isValidDate } from "../util.js";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 const SVG_NS = "http://www.w3.org/2000/svg";
+// 「目標以上」が達成の栄養素(それ以外は「目標以内」が達成で、超えると超過扱い)
+const AT_LEAST = new Set(["protein", "fiber"]);
 const W = 320, H = 190, PAD = { l: 8, r: 8, t: 22, b: 34 };
 
 function parts(str) {
@@ -33,7 +35,7 @@ function chart(def, days, goal) {
   root.append(svg("line", { x1: PAD.l, x2: W - PAD.r, y1: y(0), y2: y(0), class: "ax" }));
   days.forEach((d, i) => {
     const cx = PAD.l + slot * i + slot / 2;
-    const over = hasGoal && d.value > goal && def.key !== "protein";
+    const over = hasGoal && d.value > goal && !AT_LEAST.has(def.key);
     if (d.value > 0) {
       const top = y(d.value);
       root.append(
@@ -108,7 +110,7 @@ export function renderHistory(root, { query }) {
     const avg = logged.length ? logged.reduce((s, d) => s + d.value, 0) / logged.length : 0;
     const hasGoal = goal > 0;
     // たんぱく質・食物繊維は「目標以上」、それ以外は「目標以内」を達成とする(グラフの超過表示と一致させる)
-    const atLeast = key === "protein" || key === "fiber";
+    const atLeast = AT_LEAST.has(key);
     const achieved = logged.filter((d) => (atLeast ? d.value >= goal : d.value <= goal)).length;
     // 週移動のリンクにも選択中の栄養素を引き継ぐ
     navLinks.forEach(({ a, target }) => a.setAttribute("href", path(target)));
@@ -128,6 +130,8 @@ export function renderHistory(root, { query }) {
         el("div", {}, el("span", { class: "k" }, "記録した日の平均"), el("strong", {}, loaded && logged.length ? `${avg.toFixed(def.decimals)}${def.unit}` : "—")),
         el("div", {}, el("span", { class: "k" }, atLeast ? "目標以上の日" : "目標以内の日"), el("strong", {}, loaded && hasGoal ? `${achieved} / ${logged.length}日` : "—"))),
       chart(def, days, goal),
+      // 色だけに頼らず、超過は文字でも示す(超過表示があるのは、たんぱく質以外で目標がある場合)
+      hasGoal && !atLeast ? el("p", { class: "hint chart-note" }, "▲ は目標を超えた日です") : null,
       !loaded && !failed ? el("p", { class: "empty" }, "読み込み中…") : null,
       loaded && !logged.length ? el("p", { class: "empty" }, "この週の記録はありません") : null);
 

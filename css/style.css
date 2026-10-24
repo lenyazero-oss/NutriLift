@@ -1,41 +1,5 @@
+/* 色のトークンは css/themes.css で定義する(テーマごと)。ここには色以外の共通値だけを置く。 */
 :root {
-  /* アクセント */
-  --accent: #1f8a4c;
-  --accent-dark: #166a39;
-  --on-accent: #fff;
-  /* 背景・面(役割ごとに独立) */
-  --bg: #f4f6f5;
-  --surface: #fff;
-  --surface-input: #fff;
-  --surface-button: #fff;
-  --surface-tabbar: #fff;
-  /* 文字 */
-  --text: #1c2421;
-  --text-sub: #55615d;
-  --muted: #6b7773;
-  /* 線・バーのトラック */
-  --border: #d9dfdc;
-  --divider: #eef1ef;
-  --track: #e6ebe8;
-  /* 警告(目標超過) */
-  --warn-bar: #e08a1e;
-  --warn-chart: #c46f00;
-  --warn-text: #b86a00;
-  /* エラー */
-  --danger: #c0392b;
-  --danger-border: #f0c9c4;
-  --danger-bg: #fdecea;
-  --on-danger: #fff;
-  /* 通知 */
-  --notice-bg: #e8f5ec;
-  --notice-text: #166a39;
-  /* トースト */
-  --toast-bg: rgba(28, 36, 33, 0.92);
-  --toast-text: #fff;
-  --toast-action: #9be3b4;
-  /* その他 */
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --chart-halo: #fff;
   --tab-h: 56px;
 }
 
@@ -70,7 +34,8 @@ h1 { font-size: 24px; margin: 0 0 8px; }
   border-radius: 14px;
   padding: 16px;
   margin: 12px 0;
-  box-shadow: var(--shadow-card);
+  /* 暗いテーマでは影が見えないため、細い輪郭線(レイアウトに影響しない)で面を区切る */
+  box-shadow: var(--shadow-card), 0 0 0 1px var(--card-ring);
 }
 
 /* フォーム・ボタン(iOSのズーム防止のため16px以上) */
@@ -100,7 +65,7 @@ input, select, textarea {
 .btn:disabled { opacity: 0.5; }
 .btn-big { min-height: 54px; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.btn-primary:active { background: var(--accent-dark); }
+.btn-primary:active { filter: brightness(0.88); } /* 明るいアクセントのテーマでも押し込み感が出る */
 .btn-link { border: 0; background: none; color: var(--accent-dark); font-size: 15px; width: auto; }
 a.btn { text-align: center; text-decoration: none; line-height: 30px; }
 h2 { font-size: 19px; margin: 0 0 10px; }

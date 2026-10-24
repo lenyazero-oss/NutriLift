@@ -1,0 +1,195 @@
+/* テーマ定義。テーマを足すときは、下のブロックを1つコピーして
+   data-theme の名前・--theme-label・各トークンの値を書き換えるだけでよい
+   (設定画面の選択肢は、このファイルのブロックから自動で作られる)。
+
+   - すべてのテーマで、同じトークンをすべて定義すること。
+   - 文字と背景は 4.5:1 以上、グラフ・バーなどの図形は面に対して 3:1 以上にする
+     (確認は tools/check_contrast.py)。
+   - --on-accent は「アクセント色の上に置く文字色」。アクセントが明るいテーマでは暗い色にする。
+   - --accent-dark は「面の上に置くアクセント色の文字・リンク」の色(暗いテーマでは明るい色になる)。
+   - --theme-color は <meta name="theme-color">(ブラウザの上部バーなど)に使う色。
+   - アクセントを変えるときは、manifest.json(ホーム画面用。テーマでは切り替えない)は別扱い。 */
+
+/* ライト(現行のグリーン)。:root にも当てて、テーマ未指定でもこの配色になる。
+   現行から、コントラスト確保のために次の4つだけ微調整している:
+   --accent(白文字 4.38→4.85)、--muted(背景上 4.30→5.1)、--warn-text(白上 4.1→5.2)、--warn-bar(白上 2.7→3.7) */
+:root,
+[data-theme="light"] {
+  --theme-label: "ライト";
+  color-scheme: light;
+  --theme-color: #1c8247;
+  --card-ring: transparent;
+
+  --accent: #1c8247;
+  --accent-dark: #166a39;
+  --on-accent: #fff;
+
+  --bg: #f4f6f5;
+  --surface: #fff;
+  --surface-input: #fff;
+  --surface-button: #fff;
+  --surface-tabbar: #fff;
+
+  --text: #1c2421;
+  --text-sub: #55615d;
+  --muted: #5f6b67;
+
+  --border: #d9dfdc;
+  --divider: #eef1ef;
+  --track: #e6ebe8;
+
+  --warn-bar: #c46f00;
+  --warn-chart: #c46f00;
+  --warn-text: #a15c00;
+
+  --danger: #c0392b;
+  --danger-border: #f0c9c4;
+  --danger-bg: #fdecea;
+  --on-danger: #fff;
+
+  --notice-bg: #e8f5ec;
+  --notice-text: #166a39;
+
+  --toast-bg: rgba(28, 36, 33, 0.92);
+  --toast-text: #fff;
+  --toast-action: #9be3b4;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --chart-halo: #fff;
+}
+
+/* ダーク */
+[data-theme="dark"] {
+  --theme-label: "ダーク";
+  color-scheme: dark;
+  --theme-color: #121614;
+  --card-ring: #2f3935;
+
+  --accent: #3fb872;
+  --accent-dark: #5fd08e;
+  --on-accent: #08170f;
+
+  --bg: #121614;
+  --surface: #1c2220;
+  --surface-input: #151b18;
+  --surface-button: #232b28;
+  --surface-tabbar: #181e1b;
+
+  --text: #e8eeeb;
+  --text-sub: #b4beba;
+  --muted: #9aa6a1;
+
+  --border: #56635d;
+  --divider: #2a322f;
+  --track: #2e3834;
+
+  --warn-bar: #f0a23a;
+  --warn-chart: #f0a23a;
+  --warn-text: #f2b25c;
+
+  --danger: #ff8f82;
+  --danger-border: #6b3530;
+  --danger-bg: #3a1f1c;
+  --on-danger: #2a0d0a;
+
+  --notice-bg: #17301f;
+  --notice-text: #8fe0ae;
+
+  --toast-bg: rgba(232, 238, 235, 0.96);
+  --toast-text: #121614;
+  --toast-action: #166a39;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --chart-halo: #1c2220;
+}
+
+/* ジム(黒 × オレンジ)。アクセントがオレンジなので、超過は黄色にして区別する(文字・▲も併用) */
+[data-theme="gym"] {
+  --theme-label: "ジム";
+  color-scheme: dark;
+  --theme-color: #0b0b0b;
+  --card-ring: #2e2e2e;
+
+  --accent: #ff7a1a;
+  --accent-dark: #ff9c4d;
+  --on-accent: #111;
+
+  --bg: #0b0b0b;
+  --surface: #181818;
+  --surface-input: #101010;
+  --surface-button: #202020;
+  --surface-tabbar: #121212;
+
+  --text: #f5f5f5;
+  --text-sub: #c4c4c4;
+  --muted: #a3a3a3;
+
+  --border: #5a5a5a;
+  --divider: #2a2a2a;
+  --track: #333;
+
+  --warn-bar: #ffd23f;
+  --warn-chart: #ffd23f;
+  --warn-text: #ffd23f;
+
+  --danger: #ff6b6b;
+  --danger-border: #6b2a2a;
+  --danger-bg: #2b1212;
+  --on-danger: #111;
+
+  --notice-bg: #2a1a0d;
+  --notice-text: #ffb070;
+
+  --toast-bg: rgba(245, 245, 245, 0.96);
+  --toast-text: #111;
+  --toast-action: #b34700;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.6);
+  --chart-halo: #181818;
+}
+
+/* パステル(ピンク × ラベンダー)。アクセントはやさしいピンクにして、その上の文字は暗い色にしている
+   (白文字では読めないため)。面や線にはラベンダーを使う */
+[data-theme="pastel"] {
+  --theme-label: "パステル";
+  color-scheme: light;
+  --theme-color: #fbf4fa;
+  --card-ring: transparent;
+
+  --accent: #d4689f;
+  --accent-dark: #9c2d66;
+  --on-accent: #231a2b;
+
+  --bg: #fbf4fa;
+  --surface: #fff;
+  --surface-input: #fff;
+  --surface-button: #fff;
+  --surface-tabbar: #fff;
+
+  --text: #2f2438;
+  --text-sub: #574a63;
+  --muted: #6a5d75;
+
+  --border: #e2d5ee;
+  --divider: #efe6f6;
+  --track: #eadff5;
+
+  --warn-bar: #b05e00;
+  --warn-chart: #b05e00;
+  --warn-text: #8f5400;
+
+  --danger: #b3261e;
+  --danger-border: #f0b6c8;
+  --danger-bg: #fdeaf0;
+  --on-danger: #fff;
+
+  --notice-bg: #efe6fa;
+  --notice-text: #5a2d8a;
+
+  --toast-bg: rgba(58, 46, 66, 0.94);
+  --toast-text: #fff;
+  --toast-action: #f5c2e0;
+
+  --shadow-card: 0 1px 3px rgba(120, 80, 140, 0.12);
+  --chart-halo: #fff;
+}
