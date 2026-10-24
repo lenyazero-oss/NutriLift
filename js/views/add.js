@@ -1,7 +1,8 @@
 // 食事追加: 食材検索 → グラム、または 単位×数量 → 記録
 import { el, toast } from "../ui.js";
-import { loadFoods, setUserData, searchFoods, unitsFor } from "../foods.js";
-import { listCustomFoods, getUnitOverrides, addMeal, deleteMeal } from "../db.js";
+import { loadFoods, searchFoods, unitsFor } from "../foods.js";
+import { ensureUserData } from "../food-picker.js";
+import { addMeal, deleteMeal } from "../db.js";
 import { shownNutrients, scale, formatValue } from "../nutrients.js";
 import { SLOTS, dateStr, isValidDate, guessSlot } from "../util.js";
 
@@ -171,8 +172,7 @@ export function renderAdd(root, { query }) {
     search.disabled = false;
     search.focus();
     try {
-      const [customFoods, unitOverrides] = await Promise.all([listCustomFoods(), getUnitOverrides()]);
-      setUserData({ customFoods, unitOverrides });
+      await ensureUserData(); // 食材マスタと共通のキャッシュ(編集時に無効化される)
       if (search.value.trim() && !selected) showResults(); // 取得前に入力された検索を更新
     } catch (e) {
       status.hidden = false;

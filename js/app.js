@@ -11,6 +11,8 @@ import { renderFoodEdit } from "./views/foodedit.js";
 import { renderLogin } from "./views/login.js";
 import { renderAdd } from "./views/add.js";
 import { el, hideToast } from "./ui.js";
+import { invalidateUserData } from "./food-picker.js";
+import { setUserData } from "./foods.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -32,16 +34,24 @@ function showScreen(name) {
 let currentUid = null;
 let redirectError = "";
 
+// ユーザーが変わったら、前ユーザーの自作食材・単位のキャッシュを捨てる
+function resetUserCache() {
+  invalidateUserData();
+  setUserData({});
+}
+
 function handleAuthChange(user) {
   if (user) {
     // トークン更新などで同じユーザーに再通知されても再描画しない
     if (user.uid === currentUid) return;
+    resetUserCache();
     currentUid = user.uid;
     showScreen("app");
     setRouterEnabled(true);
     render();
   } else {
     currentUid = null;
+    resetUserCache();
     setRouterEnabled(false);
     hideToast();
     resetView(); // 前ユーザーの画面と監視を残さない
