@@ -45,6 +45,16 @@ export function watchMeals(date, onData, onError) {
   );
 }
 
+// 期間(start〜end、両端を含む)の食事を監視する。date の範囲条件のみなので複合インデックスは不要。
+export function watchMealsRange(start, end, onData, onError) {
+  const q = fs.query(col("meals"), fs.where("date", ">=", start), fs.where("date", "<=", end));
+  return fs.onSnapshot(
+    q,
+    (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }))),
+    onError
+  );
+}
+
 // ---- レシピ: { name, servings, items:[{foodId, source, name, grams, n}] } ----
 export function watchRecipes(onData, onError) {
   return fs.onSnapshot(

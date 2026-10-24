@@ -139,6 +139,27 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 }
 .add-btn { min-height: 44px; font-size: 16px; text-align: center; text-decoration: none; line-height: 24px; }
 
+/* 履歴 */
+.segs.wrap { flex-wrap: wrap; margin-bottom: 12px; }
+.segs.wrap .seg { flex: 1 1 30%; min-height: 44px; font-size: 15px; }
+.datelabel.range { font-size: 18px; }
+.navbtn.disabled { opacity: 0.25; }
+.chart { width: 100%; height: auto; display: block; }
+.chart .ax { stroke: var(--border); stroke-width: 1; }
+.chart .bar-ok { fill: var(--green); }
+.chart .bar-over { fill: #c46f00; }
+.chart .val { font-size: 12px; paint-order: stroke; stroke: #fff; stroke-width: 3px; fill: var(--text); font-variant-numeric: tabular-nums; }
+.chart .lab { font-size: 12px; fill: var(--muted); }
+.chart .lab.today { fill: var(--green-dark); font-weight: 700; }
+.chart .goal { stroke: var(--text); stroke-width: 1; stroke-dasharray: 4 3; }
+.chart .goal-lab { font-size: 11px; fill: var(--muted); }
+.chart-sum { display: flex; gap: 16px; margin-bottom: 8px; }
+.chart-sum > div { flex: 1; }
+.chart-sum .k { display: block; font-size: 13px; color: var(--muted); }
+.chart-sum strong { font-size: 22px; }
+.days .list-item { display: flex; flex-direction: column; text-decoration: none; }
+.days .chip { margin-left: 8px; }
+
 /* レシピ */
 .recipe .btn { margin-top: 10px; }
 .recipe .meal-sub { margin-top: 2px; }

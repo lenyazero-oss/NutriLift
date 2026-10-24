@@ -4,6 +4,7 @@ import { registerRoute, initRouter, render, resetView, setRouterEnabled } from "
 import { renderToday } from "./views/today.js";
 import { renderRecipes } from "./views/recipes.js";
 import { renderRecipeEdit } from "./views/recipe-edit.js";
+import { renderHistory } from "./views/history.js";
 import { renderLogin } from "./views/login.js";
 import { renderAdd } from "./views/add.js";
 import { el, hideToast } from "./ui.js";
@@ -23,7 +24,7 @@ registerRoute("today", { tab: "today", render: renderToday });
 registerRoute("add", { tab: "today", render: renderAdd });
 registerRoute("recipes", { tab: "recipes", render: renderRecipes });
 registerRoute("recipe", { tab: "recipes", render: renderRecipeEdit });
-registerRoute("history", placeholder("履歴", "history"));
+registerRoute("history", { tab: "history", render: renderHistory });
 registerRoute("settings", placeholder("設定", "settings"));
 
 function showScreen(name) {
