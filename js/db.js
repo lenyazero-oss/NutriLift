@@ -98,6 +98,16 @@ export async function getGoals(defaults) {
   return goals;
 }
 
+// 目標値を保存する。呼び出し側は await せず、エラーだけ catch すること(オフライン時は応答が返らない)。
+export function saveGoals(goals) {
+  return fs.setDoc(fs.doc(col("settings"), "goals"), { ...goals, updatedAt: fs.serverTimestamp() }, { merge: true });
+}
+
+// 保存済みの目標値を消して初期値に戻す
+export async function deleteGoals() {
+  return fs.deleteDoc(fs.doc(col("settings"), "goals"));
+}
+
 export async function listCustomFoods() {
   const snap = await fs.getDocs(col("customFoods"));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));

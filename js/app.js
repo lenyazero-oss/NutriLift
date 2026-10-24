@@ -8,6 +8,7 @@ import { renderHistory } from "./views/history.js";
 import { renderSettings } from "./views/settings.js";
 import { renderFoodMaster } from "./views/foodmaster.js";
 import { renderFoodEdit } from "./views/foodedit.js";
+import { renderGoals } from "./views/goals.js";
 import { renderLogin } from "./views/login.js";
 import { renderAdd } from "./views/add.js";
 import { el, hideToast } from "./ui.js";
@@ -24,6 +25,7 @@ registerRoute("history", { tab: "history", render: renderHistory });
 registerRoute("settings", { tab: "settings", render: renderSettings });
 registerRoute("foodmaster", { tab: "settings", render: renderFoodMaster });
 registerRoute("foodedit", { tab: "settings", render: renderFoodEdit });
+registerRoute("goals", { tab: "settings", render: renderGoals });
 
 function showScreen(name) {
   $("splash").hidden = name !== "splash";

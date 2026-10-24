@@ -55,11 +55,14 @@ export function renderSettings(root) {
       el("p", { class: "hint" }, "タップするとすぐに切り替わります。この端末だけの設定です。"),
       themePicker()),
     el("ul", { class: "list" },
+      el("li", {}, el("a", { class: "list-item", href: "#/goals" },
+        el("span", { class: "name" }, "目標値"),
+        el("span", { class: "meta" }, "1日のたんぱく質・エネルギーなどの目標を変更"))),
       el("li", {}, el("a", { class: "list-item", href: "#/foodmaster" },
         el("span", { class: "name" }, "食材マスタ"),
         el("span", { class: "meta" }, "食材の単位(個・杯など)の設定と、自作食材の登録")))),
     el("button", {
-      type: "button", class: "btn btn-danger",
+      type: "button", class: "btn btn-danger btn-far",
       onclick: () => {
         if (!confirm("ログアウトしますか?")) return;
         signOut().catch(() => toast("ログアウトできませんでした。", { error: true }));
