@@ -133,6 +133,30 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 }
 .add-btn { min-height: 44px; font-size: 16px; text-align: center; text-decoration: none; line-height: 24px; }
 
+/* テーマ選択: カード自身に data-theme が付くので、各カードはそのテーマの色で表示される */
+.theme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.theme-card {
+  display: flex; flex-direction: column; gap: 6px; text-align: left; min-height: 104px; padding: 10px;
+  font-size: 16px; font-weight: 600; background: var(--bg); color: var(--text);
+  border: 2px solid var(--border); border-radius: 12px;
+}
+.theme-card:active { transform: scale(0.98); }
+.theme-card.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+/* 「選択中」は選ぶ前から行を確保し(visibility)、切り替えでカードの高さが変わらないようにする。狭い幅では折り返す */
+.theme-name { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 6px; }
+.theme-on { visibility: hidden; font-size: 13px; font-weight: 700; color: var(--accent-dark); white-space: nowrap; }
+.theme-card.on .theme-on { visibility: visible; }
+.theme-sub { font-size: 13px; font-weight: 400; color: var(--text-sub); }
+.theme-auto { grid-column: 1 / -1; min-height: 0; }
+.tp { background: var(--surface); color: var(--text); border-radius: 8px; padding: 8px; box-shadow: 0 0 0 1px var(--border); }
+.tp-track { height: 6px; background: var(--track); border-radius: 3px; overflow: hidden; }
+.tp-fill { width: 65%; height: 100%; background: var(--accent); }
+.tp-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.tp-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); }
+.tp-dot.warn { background: var(--warn-bar); }
+.tp-aa { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--text-sub); }
+.tp-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
 /* 食材マスタ: 破壊的な操作は保存ボタンから離す */
 .btn-far { margin-top: 56px; }
 .reset-link { margin-top: 32px; }

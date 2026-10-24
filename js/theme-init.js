@@ -11,9 +11,18 @@
 
   // localStorage が使えない環境でも、このページの間は選択が効くようにメモリにも持つ
   var mem = null;
-  function read() {
+  function readRaw() {
     if (mem) return mem;
     try { return localStorage.getItem(KEY) || "auto"; } catch (e) { return "auto"; }
+  }
+  // 一覧にないID(削除されたテーマなど)は "auto" として扱い、見た目と選択表示がずれないようにする
+  function known(choice) {
+    if (choice === "auto") return true;
+    return list().some(function (t) { return t.id === choice; });
+  }
+  function read() {
+    var value = readRaw();
+    return known(value) ? value : "auto";
   }
   function write(value) {
     mem = value;
@@ -62,7 +71,7 @@
   try {
     var param = new URLSearchParams(location.search).get("theme");
     // 一覧にあるテーマIDか "auto" のときだけ保存する(不正な値で設定が壊れないように)
-    if (param && (param === "auto" || list().some(function (t) { return t.id === param; }))) write(param);
+    if (param && known(param)) write(param);
   } catch (e) { /* 無視 */ }
 
   // OSの設定が変わったとき、「自動」なら追従する
@@ -75,7 +84,7 @@
   window.NutriTheme = {
     list: list,
     get: read,
-    set: function (choice) { write(choice); apply(); },
+    set: function (choice) { if (known(choice)) { write(choice); apply(); } },
   };
   apply();
 })();
