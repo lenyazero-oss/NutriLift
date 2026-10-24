@@ -2,7 +2,7 @@
 import { el, toast } from "../ui.js";
 import { watchMeals, getGoals, deleteMeal, restoreMeal } from "../db.js";
 import { currentUid } from "../auth.js";
-import { shownNutrients, DEFAULT_GOALS, sumNutrients } from "../nutrients.js";
+import { shownNutrients, DEFAULT_GOALS, sumNutrients, AT_LEAST } from "../nutrients.js";
 import { SLOTS, dateStr, shiftDate, isValidDate } from "../util.js";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -13,21 +13,25 @@ function dateLabel(str) {
   return `${m}月${d}日(${wd})`;
 }
 
-// 達成バー。値が目標を超えた場合、たんぱく質以外は「超過」色にする
+// 達成バー。値が目標を超えた場合、「目標以上」が達成の栄養素(たんぱく質・食物繊維)以外は「超過」色にする
 function bar(def, value, goal, { big = false } = {}) {
   const ratio = goal > 0 ? value / goal : 0;
-  const over = ratio > 1 && def.key !== "protein";
+  const atLeast = AT_LEAST.has(def.key);
+  const over = ratio > 1 && !atLeast;
+  const reached = atLeast && goal > 0 && ratio >= 1; // 「以上」型は届いたら達成を文字でも示す
   const fill = el("div", { class: `fill${over ? " over" : ""}`, style: `width:${Math.min(ratio, 1) * 100}%` });
   const track = el("div", {
     class: "track", role: "progressbar", "aria-label": def.label,
     "aria-valuemin": "0", "aria-valuemax": String(goal), "aria-valuenow": String(Math.round(value)),
+    ...(reached ? { "aria-valuetext": "目標達成" } : {}),
   }, fill);
   const nums = `${value.toFixed(def.decimals)} / ${goal}${def.unit}`;
   if (!big) {
     // 色だけに頼らず、超過は文字でも示す
     return el("div", { class: "bar" },
       el("div", { class: "bar-head" }, el("span", {}, def.label), el("span", { class: "bar-num" }, nums)), track,
-      over ? el("div", { class: "over-text" }, `+${(value - goal).toFixed(def.decimals)}${def.unit} 超過`) : null);
+      over ? el("div", { class: "over-text" }, `+${(value - goal).toFixed(def.decimals)}${def.unit} 超過`) : null,
+      reached ? el("div", { class: "reached-text" }, "✓ 目標達成") : null);
   }
   const remain = goal - value;
   return el("div", { class: "bar bar-big" },

@@ -21,6 +21,9 @@ export const shownNutrients = () => NUTRIENTS.filter((n) => n.shown);
 // 目標値の初期値(設定画面で変更可)
 export const DEFAULT_GOALS = { kcal: 2400, protein: 130, fat: 65, carb: 300, fiber: 20 };
 
+// 「目標以上」が達成の栄養素(それ以外は「目標以内」が達成で、超えると超過扱い)。今日・履歴で共通
+export const AT_LEAST = new Set(["protein", "fiber"]);
+
 // 100gあたりの栄養素 n を grams グラム分に換算(未定義の栄養素は含めない)
 export function scale(n, grams) {
   const out = {};

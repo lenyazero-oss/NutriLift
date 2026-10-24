@@ -2,7 +2,7 @@
 import { el, toast } from "../ui.js";
 import { getGoals, saveGoals, deleteGoals } from "../db.js";
 import { navigate } from "../router.js";
-import { shownNutrients, DEFAULT_GOALS } from "../nutrients.js";
+import { shownNutrients, DEFAULT_GOALS, AT_LEAST } from "../nutrients.js";
 
 const MAX_GOAL = 99999;
 
@@ -74,7 +74,7 @@ export function renderGoals(root) {
       el("h1", {}, "目標値"),
       ...(loadFailed ? [el("p", { class: "error", role: "alert" }, "保存済みの目標値を読み込めなかったため、初期値を表示しています。保存すると上書きされます。")] : []),
       el("section", { class: "card" },
-        el("p", { class: "hint" }, "1日の目標です。たんぱく質と食物繊維は「目標以上」、ほかは「目標以内」を達成として扱います。"),
+        el("p", { class: "hint" }, `1日の目標です。${defs.filter((d) => AT_LEAST.has(d.key)).map((d) => d.label).join("と")}は「目標以上」、ほかは「目標以内」を達成として扱います。`),
         ...inputs.map(({ def, input }) => el("label", { class: "lbl" }, `${def.label}(${def.unit})`, input))),
       error, saveBtn,
       el("button", {

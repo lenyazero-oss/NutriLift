@@ -1,13 +1,11 @@
 // 履歴画面: 7日間の棒グラフ(栄養素を切り替え可)と、日ごとの合計一覧
 import { el } from "../ui.js";
 import { watchMealsRange, getGoals } from "../db.js";
-import { shownNutrients, DEFAULT_GOALS, sumNutrients } from "../nutrients.js";
+import { shownNutrients, DEFAULT_GOALS, sumNutrients, AT_LEAST } from "../nutrients.js";
 import { dateStr, shiftDate, isValidDate } from "../util.js";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 const SVG_NS = "http://www.w3.org/2000/svg";
-// 「目標以上」が達成の栄養素(それ以外は「目標以内」が達成で、超えると超過扱い)
-const AT_LEAST = new Set(["protein", "fiber"]);
 const W = 320, H = 190, PAD = { l: 8, r: 8, t: 22, b: 34 };
 
 function parts(str) {
