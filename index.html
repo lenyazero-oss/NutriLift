@@ -16,6 +16,28 @@
   <title>NutriLift</title>
 </head>
 <body>
+  <!-- アイコン定義(24x24、線は currentColor)。色・太さ・丸みは css/style.css の .ico で統一する -->
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-today" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4.5"/>
+      <path d="M2.5 3v5a1.5 1.5 0 0 0 3 0V3M4 9.5V21"/>
+      <path d="M20.5 21V3c-1.7 1.2-2.7 3.7-2.7 6.7h2.7"/>
+    </symbol>
+    <symbol id="i-recipes" viewBox="0 0 24 24">
+      <path d="M12 6.5C10.5 5 8 4.5 4 4.5v13c4 0 6.5.5 8 2 1.5-1.5 4-2 8-2v-13c-4 0-6.5.5-8 2z"/>
+      <path d="M12 6.5v13"/>
+    </symbol>
+    <symbol id="i-history" viewBox="0 0 24 24">
+      <path d="M3.5 20.5h17"/>
+      <path d="M3.5 16.5l5-5.5 4 3.5 7.5-8.5"/>
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3"/>
+      <circle cx="12" cy="12" r="7"/>
+      <path d="M12 5V2.5M12 19v2.5M5 12H2.5M19 12h2.5M7.05 7.05L5.28 5.28M16.95 7.05l1.77-1.77M7.05 16.95l-1.77 1.77M16.95 16.95l1.77 1.77"/>
+    </symbol>
+  </svg>
+
   <!-- 起動中表示 -->
   <div id="splash" class="splash">読み込み中…</div>
 
@@ -25,11 +47,11 @@
   <!-- ログイン後のアプリ本体 -->
   <div id="app" hidden>
     <main id="view" class="view"></main>
-    <nav class="tabbar" id="tabbar">
-      <a href="#/today" data-tab="today"><span class="ico" aria-hidden="true">🍽</span>今日</a>
-      <a href="#/recipes" data-tab="recipes"><span class="ico" aria-hidden="true">📖</span>レシピ</a>
-      <a href="#/history" data-tab="history"><span class="ico" aria-hidden="true">📈</span>履歴</a>
-      <a href="#/settings" data-tab="settings"><span class="ico" aria-hidden="true">⚙️</span>設定</a>
+    <nav class="tabbar" id="tabbar" aria-label="メインメニュー">
+      <a href="#/today" data-tab="today"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-today"/></svg>今日</a>
+      <a href="#/recipes" data-tab="recipes"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-recipes"/></svg>レシピ</a>
+      <a href="#/history" data-tab="history"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-history"/></svg>履歴</a>
+      <a href="#/settings" data-tab="settings"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-settings"/></svg>設定</a>
     </nav>
   </div>
 

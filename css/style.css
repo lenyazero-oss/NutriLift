@@ -259,7 +259,15 @@ form .btn-link { margin: 6px auto 0; }
   color: var(--text-sub);
   text-decoration: none;
 }
-.tabbar a .ico { font-size: 20px; line-height: 1.2; }
+/* アイコン: 24px、線の太さ・角の丸みを全アイコンで統一。色は文字色(currentColor)に追従 */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.ico {
+  width: 24px; height: 24px; display: block; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.75;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+/* 選択中は線を太くして、色の差が小さくても分かるようにする */
+.tabbar a.active .ico { stroke-width: 2.25; }
 .tabbar a.active { color: var(--accent-dark); font-weight: 700; }
 
 .toast {
