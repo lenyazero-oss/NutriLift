@@ -8,5 +8,8 @@
     <rect x="416" y="238" width="36" height="36" rx="8"/>
     <rect x="160" y="248" width="192" height="16"/>
   </g>
-  <text x="256" y="400" font-size="72" font-weight="700" text-anchor="middle" fill="#fff" font-family="sans-serif">P</text>
+  <!-- P(フォントに依存しないよう図形で描く。tools/make_icons.py と同じ座標) -->
+  <rect x="230" y="342" width="14" height="60" fill="#fff"/>
+  <rect x="230" y="342" width="52" height="40" rx="20" fill="#fff"/>
+  <rect x="244" y="356" width="24" height="12" rx="6" fill="#1f8a4c"/>
 </svg>

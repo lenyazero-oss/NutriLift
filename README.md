@@ -41,7 +41,13 @@ Safari でURLを開く > 共有ボタン > 「ホーム画面に追加」。
 
 ### アイコンについて
 `icons/icon.svg` を用意済みです。iOS のホーム画面用に PNG(`icons/icon-180.png`, `icon-192.png`, `icon-512.png`)が必要です。
-任意の画像ツール、またはSVG→PNG変換サービスで上記3サイズのPNGを作成し `icons/` に置いてください。
+プロジェクト直下で次を実行すると、`icon.svg` と同じ絵のPNGを3サイズ作成します(初回のみ `pip install pillow`)。
+
+```
+python tools/make_icons.py
+```
+
+`icon.svg` の絵を変えたときは、`tools/make_icons.py` の座標も合わせて直してください。
 
 ## 4. ログインについて
 
@@ -68,7 +74,7 @@ icons/
 js/  firebase-config.js firebase.js auth.js router.js ui.js app.js db.js foods.js food-picker.js nutrients.js util.js theme-init.js
 js/views/  login.js today.js add.js recipes.js recipe-edit.js history.js settings.js foodmaster.js foodedit.js
 data/  foods.json default-units.json
-tools/  convert_foods.py check_contrast.py
+tools/  convert_foods.py check_contrast.py make_icons.py
 ```
 
 ## テーマ(配色)の切り替え
