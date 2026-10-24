@@ -13,6 +13,7 @@ GitHub Pages + Firebase(Spark プラン)で無料運用します。ビルド不�
 > | 4 | レシピの作成・編集 |
 > | 5 | 履歴画面(7日間の棒グラフ、日ごとの合計) |
 > | 6 | 設定画面と食材マスタ(単位の設定、自作食材) |
+> | 追加 | テーマ(配色)の切り替え、タブのSVGアイコン |
 
 ## 1. Firebase コンソールでの作業
 
@@ -62,13 +63,42 @@ python -m http.server 8000
 
 ```
 index.html / manifest.json / sw.js / firestore.rules
-css/style.css
+css/  style.css themes.css
 icons/
-js/  firebase-config.js firebase.js auth.js router.js ui.js app.js db.js foods.js food-picker.js nutrients.js util.js
+js/  firebase-config.js firebase.js auth.js router.js ui.js app.js db.js foods.js food-picker.js nutrients.js util.js theme-init.js
 js/views/  login.js today.js add.js recipes.js recipe-edit.js history.js settings.js foodmaster.js foodedit.js
 data/  foods.json default-units.json
-tools/convert_foods.py
+tools/  convert_foods.py check_contrast.py
 ```
+
+## テーマ(配色)の切り替え
+
+設定タブの「テーマ」から、自動・ライト・ダーク・ジム(黒×オレンジ)・パステル(ピンク×ラベンダー)を選べます。タップした瞬間に切り替わります。
+
+- 「自動」は iPhone のライト/ダーク設定に合わせます(ライトとダークのテーマを使用)。
+- 選んだテーマはその端末の `localStorage` に保存されます(アカウントには保存されないので、端末ごとに設定します)。
+- 動作確認用に、URL の後ろに `?theme=gym` のように付けて開くと、そのテーマで表示して保存します(`light` / `dark` / `gym` / `pastel` / `auto`)。
+- ホーム画面アイコン(`manifest.json` と `icons/`)はテーマでは切り替わりません。
+
+### テーマを追加するとき
+
+1. `css/themes.css` の既存のブロック(例: `[data-theme="dark"]`)を丸ごとコピーします。
+2. `data-theme` の名前、`--theme-label`(設定画面に出る名前)、各色の値を書き換えます。トークンはすべてのテーマで同じものを定義します。
+3. 設定画面の選択肢は `themes.css` から自動で作られるので、コードの追加は不要です。
+
+### 配色の確認(コントラスト)
+
+文字と背景は 4.5:1 以上、バーやグラフなどの図形は面に対して 3:1 以上を目安にしています。テーマを追加・変更したら、プロジェクト直下で次を実行して確認します(全テーマの定義漏れも検出します)。
+
+```
+python tools/check_contrast.py
+```
+
+### 色の使い方のルール
+
+- 色は `css/style.css` に直書きせず、`css/themes.css` のトークン(`var(--accent)` など)で指定します。
+- 目標の超過は、色だけでなく「超過」の文字や「▲」でも示します。
+- `manifest.json` の色と `icons/icon.svg` はCSS変数が使えないため、テーマとは別に管理しています。
 
 ## 成分表の変換(Excel → foods.json)
 
