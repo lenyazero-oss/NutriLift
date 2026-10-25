@@ -22,6 +22,14 @@ export function hideToast() {
   clearTimeout(toastTimer);
 }
 
+// 書き込みの失敗を知らせるハンドラを返す(done.catch(writeFailed("レシピ")) のように使う)。
+// 失敗した書き込みは端末側でも取り消されるので、「反映されていません」と明示する。
+// 画面遷移のあとに出ても何の失敗か分かるよう、対象(what)と操作(verb)を文言に入れる。
+export function writeFailed(what, verb = "保存") {
+  return () => toast(`${what}を${verb}できませんでした。変更は反映されていません。通信状況とログイン状態を確認して、もう一度お試しください。`,
+    { error: true, duration: 8000 });
+}
+
 // action: { label, onClick } を渡すと「元に戻す」などのボタンを表示する
 export function toast(message, { action, duration = 2500, error = false } = {}) {
   const t = document.getElementById("toast");

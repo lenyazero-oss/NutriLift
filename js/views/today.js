@@ -1,5 +1,5 @@
 // 今日の画面: 日付移動、目標に対する達成バー、朝/昼/夜/間食ごとの記録一覧
-import { el, toast } from "../ui.js";
+import { el, toast, writeFailed } from "../ui.js";
 import { watchMeals, getGoals, deleteMeal, restoreMeal } from "../db.js";
 import { currentUid } from "../auth.js";
 import { shownNutrients, DEFAULT_GOALS, sumNutrients, AT_LEAST } from "../nutrients.js";
@@ -75,7 +75,7 @@ export function renderToday(root, { query }) {
   function removeMeal(m) {
     const { id } = m;
     const uid = currentUid(); // 取り消し時に同じユーザーか確認するため
-    deleteMeal(id).catch(() => toast("削除できませんでした。通信状況を確認してください。", { error: true, duration: 6000 }));
+    deleteMeal(id).catch(writeFailed(`${m.name} の記録`, "削除"));
     toast(`${m.name} を削除しました`, {
       action: {
         label: "元に戻す",

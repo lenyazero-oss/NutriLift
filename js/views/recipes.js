@@ -1,5 +1,5 @@
 // レシピ一覧: 1タップで記録 / 人前・区分・日付を調整して記録 / 編集
-import { el, toast } from "../ui.js";
+import { el, toast, writeFailed } from "../ui.js";
 import { watchRecipes, addMeal, deleteMeal } from "../db.js";
 import { recipePortion } from "../nutrients.js";
 import { SLOTS, dateStr, guessSlot } from "../util.js";
@@ -13,8 +13,7 @@ function recordRecipe(recipe, portions, date, slot) {
     date, slot, foodId: null, source: "recipe", recipeId: recipe.id, name: recipe.name,
     grams: p.grams, qtyText: `${portions}人前`, nutrients: p.nutrients,
   };
-  const saveError = () =>
-    toast("保存できませんでした。通信状況を確認して、もう一度お試しください。", { error: true, duration: 6000 });
+  const saveError = writeFailed(`${recipe.name} の記録`);
   try {
     const { id, done } = addMeal(meal);
     done.catch(saveError);

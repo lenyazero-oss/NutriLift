@@ -1,5 +1,5 @@
 // レシピの作成・編集: 名前、できあがりの人前数、食材(グラム)の一覧
-import { el, toast } from "../ui.js";
+import { el, toast, writeFailed } from "../ui.js";
 import { createFoodPicker } from "../food-picker.js";
 import { unitsFor } from "../foods.js";
 import { getRecipe, saveRecipe, deleteRecipe } from "../db.js";
@@ -141,8 +141,7 @@ export function renderRecipeEdit(root, { args }) {
       try {
         // オフライン時は応答が返らないため await しない
         const { done } = saveRecipe(id, data);
-        done.catch(() =>
-          toast("保存できませんでした。通信状況を確認して、もう一度作成してください。", { error: true, duration: 6000 }));
+        done.catch(writeFailed(`レシピ「${data.name}」`));
       } catch {
         toast("保存できませんでした。", { error: true });
         saveBtn.disabled = false;
@@ -169,7 +168,7 @@ export function renderRecipeEdit(root, { args }) {
         type: "button", class: "btn btn-danger",
         onclick: () => {
           if (!confirm(`「${recipe.name}」を削除しますか?\n(記録済みの食事は消えません)`)) return;
-          deleteRecipe(id).catch(() => toast("削除できませんでした。", { error: true }));
+          deleteRecipe(id).catch(writeFailed(`レシピ「${recipe.name}」`, "削除"));
           toast("レシピを削除しました");
           leaving = true;
           navigate("#/recipes");

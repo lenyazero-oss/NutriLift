@@ -1,5 +1,5 @@
 // 目標値の編集(#/goals)。未設定の項目は初期値で補われる。
-import { el, toast } from "../ui.js";
+import { el, toast, writeFailed } from "../ui.js";
 import { getGoals, saveGoals, deleteGoals } from "../db.js";
 import { navigate } from "../router.js";
 import { shownNutrients, DEFAULT_GOALS, AT_LEAST } from "../nutrients.js";
@@ -40,8 +40,8 @@ export function renderGoals(root) {
     }
 
     // オフライン時は応答が返らないため await しない
-    function finish(message, done) {
-      done.catch(() => toast("保存できませんでした。通信状況を確認して、もう一度操作してください。", { error: true, duration: 6000 }));
+    function finish(message, done, verb = "保存") {
+      done.catch(writeFailed("目標値", verb));
       toast(navigator.onLine === false ? `${message}(通信が回復したら反映されます)` : message);
       navigate("#/settings");
     }
@@ -82,7 +82,7 @@ export function renderGoals(root) {
         onclick: (e) => {
           if (!confirm("保存した目標値を捨てて、初期値に戻します。元に戻せません。よろしいですか?")) return;
           e.currentTarget.disabled = true; // 連打防止
-          finish("初期値に戻しました", deleteGoals());
+          finish("初期値に戻しました", deleteGoals(), "初期値への復元");
         },
       }, "初期値に戻す"));
   }

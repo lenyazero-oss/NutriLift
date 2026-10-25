@@ -1,5 +1,5 @@
 // 食事追加: 食材検索 → グラム、または 単位×数量 → 記録
-import { el, toast } from "../ui.js";
+import { el, toast, writeFailed } from "../ui.js";
 import { loadFoods, searchFoods, unitsFor } from "../foods.js";
 import { ensureUserData } from "../food-picker.js";
 import { addMeal, deleteMeal } from "../db.js";
@@ -120,8 +120,7 @@ export function renderAdd(root, { query }) {
         grams: Math.round(g * 10) / 10, qtyText, nutrients: scale(food.n, g),
       };
       // オフライン時は応答が返らないため await しない
-      const saveError = () =>
-        toast("保存できませんでした。通信状況を確認して、もう一度お試しください。", { error: true, duration: 6000 });
+      const saveError = writeFailed(`${food.name} の記録`);
       try {
         const { id, done } = addMeal(meal);
         done.catch(saveError);

@@ -2,7 +2,7 @@
 //  #/foodedit/new            自作食材の新規作成
 //  #/foodedit/custom/<id>    自作食材の編集(名前・栄養素・単位)
 //  #/foodedit/table/<id>     成分表の食材の単位の上書き
-import { el, toast } from "../ui.js";
+import { el, toast, writeFailed } from "../ui.js";
 import { loadFoods, findFood, unitsFor } from "../foods.js";
 import { ensureUserData, invalidateUserData } from "../food-picker.js";
 import { saveCustomFood, deleteCustomFood, saveUnitOverride, deleteUnitOverride } from "../db.js";
@@ -102,9 +102,9 @@ export function renderFoodEdit(root, { args }) {
 
     const cleanUnits = () => units.map((u) => ({ name: u.name.trim(), g: Math.round(u.g * 10) / 10 }));
 
-    function finish(message, done) {
+    function finish(message, done, what, verb = "保存") {
       // オフライン時は応答が返らないため await しない
-      done.catch(() => toast("保存できませんでした。通信状況を確認して、もう一度操作してください。", { error: true, duration: 6000 }));
+      done.catch(writeFailed(what, verb));
       invalidateUserData();
       toast(message);
       navigate("#/foodmaster");
@@ -123,9 +123,10 @@ export function renderFoodEdit(root, { args }) {
             const v = parseFloat(input.value);
             n[def.key] = v > 0 ? v : 0;
           });
-          finish("自作食材を保存しました", saveCustomFood(id, { name: nameInput.value.trim(), n, units: cleanUnits() }).done);
+          const name = nameInput.value.trim();
+          finish("自作食材を保存しました", saveCustomFood(id, { name, n, units: cleanUnits() }).done, `自作食材「${name}」`);
         } else {
-          finish("単位を保存しました", saveUnitOverride(food.id, cleanUnits()));
+          finish("単位を保存しました", saveUnitOverride(food.id, cleanUnits()), `「${food.name}」の単位`);
         }
       } catch {
         toast("保存できませんでした。", { error: true });
@@ -163,7 +164,7 @@ export function renderFoodEdit(root, { args }) {
         type: "button", class: "btn btn-link center reset-link",
         onclick: () => {
           if (!confirm("この食材の単位の設定を捨てて、初期値に戻します。元に戻せません。よろしいですか?")) return;
-          finish("初期値に戻しました", deleteUnitOverride(food.id));
+          finish("初期値に戻しました", deleteUnitOverride(food.id), `「${food.name}」の単位`, "初期値への復元");
         },
       }, "初期値に戻す"));
     }
@@ -172,7 +173,7 @@ export function renderFoodEdit(root, { args }) {
         type: "button", class: "btn btn-danger btn-far",
         onclick: () => {
           if (!confirm(`「${food.name}」を削除します。元に戻せません。\n(記録済みの食事・レシピは消えません)`)) return;
-          finish("自作食材を削除しました", deleteCustomFood(id));
+          finish("自作食材を削除しました", deleteCustomFood(id), `自作食材「${food.name}」`, "削除");
         },
       }, "この食材を削除"));
     }
