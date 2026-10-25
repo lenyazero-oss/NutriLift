@@ -404,8 +404,8 @@ export function renderToday(root, { query }) {
       preview,
       saveBtn,
       el("div", { class: "edit-actions" },
-        el("button", { type: "button", class: "btn btn-link", onclick: () => { editingId = null; editPanel = null; drawList(); } }, "閉じる"),
-        el("button", { type: "button", class: "btn btn-link edit-delete", onclick: () => { editingId = null; editPanel = null; removeMeal(m); } }, "この記録を削除")));
+        el("button", { type: "button", class: "btn btn-link edit-delete", onclick: () => { editingId = null; editPanel = null; removeMeal(m); } }, "この記録を削除"),
+        el("button", { type: "button", class: "btn btn-link edit-close", onclick: () => { editingId = null; editPanel = null; drawList(); } }, "閉じる")));
     update();
   }
 
@@ -472,7 +472,7 @@ export function renderToday(root, { query }) {
             : null);
       }),
       // 操作の手がかり(大きな削除ボタンをなくしたため)。記録があるときだけ出す
-      ...(meals.length && showHint ? [el("p", { class: "hint swipe-hint" }, "記録は左にスワイプで削除、タップで量を変更できます。")] : []));
+      ...(meals.length && showHint ? [el("p", { class: "hint swipe-hint" }, "記録は左にスワイプで削除できます。タップすると量の変更と、削除ができます。")] : []));
   }
 
   const redraw = () => { drawSummary(); drawList(); drawDist(); };

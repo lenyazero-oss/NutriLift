@@ -236,7 +236,7 @@ export function renderHistory(root, { query }) {
         ? el("span", { class: `${cls} future`, "aria-hidden": "true" }, ...inner)
         : el("a", { class: cls, href: `#/today?date=${date}`, "aria-label": `${m}月${d}日 ${state}` }, ...inner));
     }
-    calBox.replaceChildren(
+    calBox.replaceChildren(...[
       el("h2", {}, "たんぱく質の達成カレンダー"),
       el("div", { class: "cal-head" },
         el("button", { type: "button", class: "navbtn", "aria-label": "前の月", onclick: () => setMonth(shiftMonth(calMonth, -1)) }, "‹"),
@@ -250,7 +250,8 @@ export function renderHistory(root, { query }) {
       el("div", { class: "cal-legend" },
         el("span", {}, "✓ その日のたんぱく質の目標以上"), el("span", {}, "● 記録あり"), el("span", {}, "空白 記録なし"), el("span", {}, "枠線 今日")),
       !calLoaded ? el("p", { class: "hint" }, "読み込み中…") : null,
-      calFailed ? el("p", { class: "error", role: "alert" }, "この月の記録を読み込めませんでした。通信状況を確認してください。") : null);
+      calFailed ? el("p", { class: "error", role: "alert" }, "この月の記録を読み込めませんでした。通信状況を確認してください。") : null,
+    ].filter(Boolean)); // replaceChildren は null を文字列「null」として表示してしまうため除く
   }
 
   function setMonth(ym) {

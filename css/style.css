@@ -196,8 +196,11 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 }
 .meal-tap .meal-name, .meal-tap .meal-sub { display: block; }
 .meal-edit { padding: 4px 0 12px; }
-.edit-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
-.edit-delete { color: var(--danger); }
+.edit-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 16px; } /* 保存ボタンから離して、誤タップを防ぐ */
+/* 編集フォームの「閉じる」「この記録を削除」は控えめな文字リンクにする(大きなボタンにしない) */
+.edit-actions .btn { width: auto; min-height: 40px; padding: 0 10px; font-size: 14px; font-weight: 400; }
+.edit-delete { color: var(--danger); text-decoration: underline; }
+.edit-actions .edit-close { padding: 0 16px; }
 .hint.swipe-hint { margin: 0 0 8px; }
 /* 摂取量/残り量の切り替え */
 .summary { position: relative; cursor: pointer; }
