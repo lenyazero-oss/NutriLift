@@ -131,7 +131,8 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 .bar-num { font-variant-numeric: tabular-nums; }
 .track { height: 10px; background: var(--track); border-radius: 6px; overflow: hidden; }
 .fill { height: 100%; background: var(--accent); border-radius: 6px; transition: width 0.25s; }
-.fill.over { background: var(--warn-bar); }
+/* 色だけでなく斜線でも超過を示す */
+.fill.over { background: repeating-linear-gradient(-45deg, var(--warn-bar) 0 5px, rgba(0, 0, 0, 0.4) 5px 8px); }
 .bar-big .bar-title { font-size: 17px; font-weight: 700; color: var(--text); }
 .bar-big .big-num { font-size: 18px; color: var(--text-sub); margin-bottom: 6px; }
 .bar-big .big-num strong { font-size: 44px; line-height: 1.1; color: var(--text); }
@@ -193,7 +194,9 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 .chart { width: 100%; height: auto; display: block; }
 .chart .ax { stroke: var(--border); stroke-width: 1; }
 .chart .bar-ok { fill: var(--accent); }
-.chart .bar-over { fill: var(--warn-chart); }
+.chart .bar-over { fill: url(#over-hatch) var(--warn-chart); }
+.chart .hatch-bg { fill: var(--warn-chart); }
+.chart .hatch-line { fill: rgba(0, 0, 0, 0.4); }
 .chart .val { font-size: 12px; paint-order: stroke; stroke: var(--chart-halo); stroke-width: 3px; fill: var(--text); font-variant-numeric: tabular-nums; }
 .chart .lab { font-size: 12px; fill: var(--muted); }
 .chart .lab.today { fill: var(--accent-dark); font-weight: 700; }

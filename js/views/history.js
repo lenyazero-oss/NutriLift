@@ -30,6 +30,12 @@ function chart(def, days, goal) {
   const root = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img",
     "aria-label": `${def.label}の${days.length}日間の推移${hasGoal ? `。目標 ${goal}${def.unit}` : ""}` });
 
+  // 超過の棒は色だけでなく斜線の模様でも区別する(緑と橙が見分けにくい人向け)
+  const hatch = svg("pattern", { id: "over-hatch", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
+  hatch.append(svg("rect", { width: 6, height: 6, class: "hatch-bg" }), svg("rect", { width: 3, height: 6, class: "hatch-line" }));
+  const defs = svg("defs");
+  defs.append(hatch);
+  root.append(defs);
   root.append(svg("line", { x1: PAD.l, x2: W - PAD.r, y1: y(0), y2: y(0), class: "ax" }));
   days.forEach((d, i) => {
     const cx = PAD.l + slot * i + slot / 2;
@@ -67,6 +73,8 @@ export function renderHistory(root, { query }) {
 
   let meals = [];
   let goals = { ...DEFAULT_GOALS };
+  // 目標が届くまでは目標線と達成判定を出さない(初期値で描いてから動くのを防ぐ)
+  let goalsLoaded = false;
   let loaded = false;
   let failed = false;
   let alive = true;
@@ -104,7 +112,7 @@ export function renderHistory(root, { query }) {
 
   function draw() {
     const def = defs.find((d) => d.key === key);
-    const goal = goals[key] ?? 0;
+    const goal = goalsLoaded ? goals[key] ?? 0 : 0;
     const days = dayData().map((d) => ({ ...d, value: d.total[key] || 0 }));
     const logged = days.filter((d) => d.count > 0);
     const avg = logged.length ? logged.reduce((s, d) => s + d.value, 0) / logged.length : 0;
@@ -131,7 +139,7 @@ export function renderHistory(root, { query }) {
         el("div", {}, el("span", { class: "k" }, atLeast ? "目標以上の日" : "目標以内の日"), el("strong", {}, loaded && hasGoal ? `${achieved} / ${logged.length}日` : "—"))),
       chart(def, days, goal),
       // 色だけに頼らず、超過は文字でも示す(超過表示があるのは、たんぱく質以外で目標がある場合)
-      hasGoal && !atLeast ? el("p", { class: "hint chart-note" }, "▲ は目標を超えた日です") : null,
+      hasGoal && !atLeast ? el("p", { class: "hint chart-note" }, "▲ と斜線の棒は目標を超えた日です") : null,
       !loaded && !failed ? el("p", { class: "empty" }, "読み込み中…") : null,
       loaded && !logged.length ? el("p", { class: "empty" }, "この週の記録はありません") : null,
     ].filter(Boolean)); // replaceChildren は null を文字列「null」として表示してしまうため除く
@@ -164,9 +172,10 @@ export function renderHistory(root, { query }) {
       draw();
     });
 
+  // 取得できなかったときは初期値の目標で表示する
   getGoals(DEFAULT_GOALS)
-    .then((g) => { if (alive) { goals = g; draw(); } })
-    .catch(() => {});
+    .then((g) => { goals = g; }, () => {})
+    .then(() => { if (alive) { goalsLoaded = true; draw(); } });
 
   return () => { alive = false; unwatch(); };
 }
