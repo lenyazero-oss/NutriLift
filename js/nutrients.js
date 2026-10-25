@@ -50,14 +50,19 @@ export function recipeTotals(items) {
   return sumNutrients(items.map((it) => ({ nutrients: scale(it.n || {}, it.grams) })));
 }
 
-// 全体を「全体の人前数」で割り、portions 人前分にした栄養素と重さ
+// 食材の合計の重さ(g)
+export const itemsWeight = (items) => (items || []).reduce((s, it) => s + (Number(it.grams) || 0), 0);
+
+// レシピ全体の重さ(g): 完成重量(鍋の総重量など。任意)があればそれ、なければ食材の合計
+export const recipeWeight = (recipe) => (recipe.totalWeight > 0 ? recipe.totalWeight : itemsWeight(recipe.items));
+
+// 全体を「全体の人前数」で割り、portions 人前分にした栄養素と重さ(重さは完成重量があればそれを基準にする)
 export function recipePortion(recipe, portions) {
   const ratio = portions / (recipe.servings || 1);
   const total = recipeTotals(recipe.items || []);
   const nutrients = {};
   for (const [k, v] of Object.entries(total)) nutrients[k] = Math.round(v * ratio * 100) / 100;
-  const grams = (recipe.items || []).reduce((s, it) => s + (Number(it.grams) || 0), 0) * ratio;
-  return { nutrients, grams: Math.round(grams * 10) / 10 };
+  return { nutrients, grams: Math.round(recipeWeight(recipe) * ratio * 10) / 10 };
 }
 
 export function formatValue(def, value) {

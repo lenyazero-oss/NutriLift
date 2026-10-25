@@ -95,7 +95,10 @@ export async function getRecipe(id) {
 export function saveRecipe(id, data) {
   const ref = id ? fs.doc(col("recipes"), id) : fs.doc(col("recipes"));
   const stamp = id ? {} : { createdAt: fs.serverTimestamp() };
-  const done = fs.setDoc(ref, { ...data, ...stamp, updatedAt: fs.serverTimestamp() }, { merge: true });
+  // 完成重量(任意)を空にしたときは null で渡す。merge 保存では、項目を明示して削除しないと古い値が残るため
+  const payload = { ...data };
+  if (payload.totalWeight === null) payload.totalWeight = fs.deleteField();
+  const done = fs.setDoc(ref, { ...payload, ...stamp, updatedAt: fs.serverTimestamp() }, { merge: true });
   return { id: ref.id, done };
 }
 

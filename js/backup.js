@@ -80,7 +80,8 @@ const VALIDATORS = {
     return "";
   },
   recipes(d) {
-    if (!keysOk(d, ["name", "servings", "items", "createdAt", "updatedAt"], ["name", "servings", "items"])) return "項目が不足しているか、余分な項目があります";
+    if (!keysOk(d, ["name", "servings", "items", "totalWeight", "createdAt", "updatedAt"], ["name", "servings", "items"])) return "項目が不足しているか、余分な項目があります";
+    if ("totalWeight" in d && !num(d.totalWeight, 0.1, 1e9)) return "完成重量が正しくありません";
     if (!str(d.name, 100)) return "名前が正しくありません";
     if (!(num(d.servings, 0, 1e9) && d.servings > 0)) return "人前数が正しくありません";
     if (!Array.isArray(d.items) || d.items.length > 200 || !d.items.every(recipeItem)) return "食材の一覧が正しくありません";

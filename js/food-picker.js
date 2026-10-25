@@ -2,6 +2,7 @@
 import { el } from "./ui.js";
 import { loadFoods, setUserData, searchFoods, displayName } from "./foods.js";
 import { listCustomFoods, getUnitOverrides, getDisplayNames } from "./db.js";
+import { createQuickFoods } from "./quick-foods.js";
 
 // 自作食材・単位の読み込みは1回だけ(失敗時は次回やり直す)。食材マスタを編集したら invalidate すること。
 let userDataPromise = null;
@@ -25,13 +26,23 @@ export function ensureUserData() {
   return userDataPromise;
 }
 
-export function createFoodPicker({ onPick, placeholder = "食材名で検索(例: 鶏むね、卵)" }) {
+// quick: true なら、検索欄にフォーカスしたとき(入力が空の間)「最近」「よく使う」の食材を出す。戻り値の destroy を画面の後片付けで呼ぶ。
+export function createFoodPicker({ onPick, placeholder = "食材名で検索(例: 鶏むね、卵)", quick: withQuick = false }) {
   const status = el("p", { class: "hint" }, "食材データを読み込み中…");
   const search = el("input", {
     type: "search", placeholder, enterkeyhint: "search", autocomplete: "off",
     "aria-label": "食材検索", disabled: true,
   });
   const results = el("ul", { class: "list" });
+
+  function pick(f) {
+    search.value = "";
+    results.replaceChildren();
+    search.blur();
+    quick?.setVisible(false);
+    onPick(f);
+  }
+  const quick = withQuick ? createQuickFoods({ onPick: pick }) : null;
 
   function showResults() {
     results.replaceChildren();
@@ -47,16 +58,21 @@ export function createFoodPicker({ onPick, placeholder = "食材名で検索(例
         el("span", { class: "name" }, displayName(f)),
         el("span", { class: "meta" },
           `${f.source === "custom" ? "自作 ・ " : ""}たんぱく質 ${(f.n.protein ?? 0).toFixed(1)}g / ${Math.round(f.n.kcal ?? 0)}kcal(100g)`));
-      btn.addEventListener("click", () => {
-        search.value = "";
-        results.replaceChildren();
-        search.blur();
-        onPick(f);
-      });
+      btn.addEventListener("click", () => pick(f));
       results.append(el("li", {}, btn));
     });
   }
-  search.addEventListener("input", showResults);
+  search.addEventListener("input", () => {
+    showResults();
+    quick?.setVisible(search.value.trim() === "");
+  });
+  // フォーカスで「最近」「よく使う」を出し、リストの外をタップしたら閉じる(リストのタップで先に閉じてしまわないよう pointerdown で判定)
+  const outside = (e) => { if (!node.contains(e.target)) quick?.setVisible(false); };
+  if (quick) {
+    search.addEventListener("focus", () => { if (!search.value.trim()) quick.setVisible(true); });
+    search.addEventListener("pointerdown", () => { if (!search.value.trim()) quick.setVisible(true); });
+    document.addEventListener("pointerdown", outside);
+  }
 
   (async () => {
     try {
@@ -71,11 +87,13 @@ export function createFoodPicker({ onPick, placeholder = "食材名で検索(例
     try {
       await ensureUserData();
       if (search.value.trim()) showResults();
+      quick?.refresh(); // 自作食材も解決できるよう、ユーザーデータのあとに集計する
     } catch {
       status.hidden = false;
       status.textContent = "自作食材と単位の設定を読み込めませんでした(成分表の食材は検索できます)。";
     }
   })();
 
-  return { node: el("div", {}, status, search, results) };
+  const node = el("div", {}, status, search, ...(quick ? [quick.node] : []), results);
+  return { node, destroy: () => document.removeEventListener("pointerdown", outside) };
 }
