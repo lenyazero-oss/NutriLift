@@ -100,13 +100,21 @@ export function renderToday(root, { query }) {
       ...SLOTS.map((s) => {
         const items = meals.filter((m) => m.slot === s.key);
         const t = sumNutrients(items);
-        return el("section", { class: "card slot" },
-          el("div", { class: "slot-head" },
+        // 記録がなくても合計は出す(読み込み中は「—」)
+        const sum = el("span", { class: "slot-sum", "aria-label": loaded ? null : "読み込み中" },
+          loaded ? `${Math.round(t.kcal || 0)}kcal ・ P ${(t.protein || 0).toFixed(1)}g` : "—");
+        const href = `#/add?date=${date}&slot=${s.key}`;
+        // 空の枠は1行にまとめて、1日の全体がスクロールなしで見えるようにする
+        if (!items.length) {
+          return el("section", { class: "card slot slot-empty" },
             el("h2", {}, s.label),
-            items.length ? el("span", { class: "slot-sum" }, `${Math.round(t.kcal || 0)}kcal ・ P ${(t.protein || 0).toFixed(1)}g`) : null),
-          items.length ? el("ul", { class: "meals" }, items.map(mealRow))
-            : el("p", { class: "empty" }, loaded ? "まだ記録がありません" : "読み込み中…"),
-          el("a", { class: "btn add-btn", href: `#/add?date=${date}&slot=${s.key}` }, `＋ ${s.label}に追加`));
+            sum,
+            el("a", { class: "btn add-inline", href, "aria-label": `${s.label}に追加` }, "＋ 追加"));
+        }
+        return el("section", { class: "card slot" },
+          el("div", { class: "slot-head" }, el("h2", {}, s.label), sum),
+          el("ul", { class: "meals" }, items.map(mealRow)),
+          el("a", { class: "btn add-btn", href }, `＋ ${s.label}に追加`));
       }));
   }
 

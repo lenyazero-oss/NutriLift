@@ -1,6 +1,7 @@
 // Firestoreの読み書きはすべてここを経由する。パスは users/{uid}/... 固定。
 import { db, fs } from "./firebase.js";
 import { currentUid } from "./auth.js";
+import { COLLECTIONS, SINGLES, decodeValue } from "./backup.js";
 
 function col(name) {
   const uid = currentUid();
@@ -117,6 +118,48 @@ export async function getProfile() {
 // 呼び出し側は await せず、エラーだけ catch すること(オフライン時は応答が返らない)。
 export function saveProfile(profile) {
   return fs.setDoc(fs.doc(col("settings"), "profile"), { ...profile, updatedAt: fs.serverTimestamp() });
+}
+
+// ---- バックアップ(書き出し/読み込み) ----
+// 全データを読む。戻り値は backup.js の形: { collections:{meals:[{id,data}],…}, singles:{goals, profile} }
+export async function readAllData() {
+  const collections = {};
+  for (const { key } of COLLECTIONS) {
+    const snap = await fs.getDocs(col(key));
+    collections[key] = snap.docs.map((d) => ({ id: d.id, data: d.data({ serverTimestamps: "estimate" }) }));
+  }
+  const singles = {};
+  for (const { key } of SINGLES) {
+    const snap = await fs.getDoc(fs.doc(col("settings"), key));
+    singles[key] = snap.exists() ? snap.data({ serverTimestamps: "estimate" }) : null;
+  }
+  return { collections, singles };
+}
+
+const BATCH_SIZE = 400; // 1回の書き込みの上限(500)に余裕を持たせる
+const COMMIT_TIMEOUT_MS = 30000;
+
+// planImport の ops を書き込む。サーバーの応答まで待つので、オフラインではタイムアウトで失敗する。
+// 途中で失敗した場合は、それまでの分が書き込み済みになる(ops の先頭が set、末尾が delete)。
+export async function writeAllData(ops, onProgress) {
+  let done = 0;
+  for (let i = 0; i < ops.length; i += BATCH_SIZE) {
+    const batch = fs.writeBatch(db);
+    for (const op of ops.slice(i, i + BATCH_SIZE)) {
+      const ref = fs.doc(col(op.coll), op.id);
+      if (op.type === "set") batch.set(ref, decodeValue(op.data, (ms) => fs.Timestamp.fromMillis(ms)));
+      else batch.delete(ref);
+    }
+    let timer;
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("timeout")), COMMIT_TIMEOUT_MS); });
+    try {
+      await Promise.race([batch.commit(), timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+    done = Math.min(i + BATCH_SIZE, ops.length);
+    onProgress?.(done, ops.length);
+  }
 }
 
 export async function listCustomFoods() {
