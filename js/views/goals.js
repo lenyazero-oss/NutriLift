@@ -1,6 +1,7 @@
 // 目標値の編集(#/goals)。未設定の項目は初期値で補われる。
 import { el, toast, writeFailed } from "../ui.js";
-import { getGoals, saveGoals, deleteGoals, getProfile, saveProfile } from "../db.js";
+import { getGoals, saveGoals, deleteGoals, getProfile, saveProfile, getGoalsRest, saveGoalsRest, deleteGoalsRest } from "../db.js";
+import { diffFromBase } from "../goals-mode.js";
 import { navigate, setLeaveGuard } from "../router.js";
 import { shownNutrients, DEFAULT_GOALS, AT_LEAST } from "../nutrients.js";
 import { SEXES, ACTIVITIES, AIMS, DEFAULT_PROFILE, validateProfile, calcGoals } from "../profile.js";
@@ -18,9 +19,12 @@ export function renderGoals(root) {
   Promise.all([
     getGoals(DEFAULT_GOALS).then((goals) => ({ goals, failed: false }), () => ({ goals: { ...DEFAULT_GOALS }, failed: true })),
     getProfile().catch(() => null),
-  ]).then(([{ goals, failed }, savedProfile]) => { if (alive) start(goals, failed, savedProfile); });
+    getGoalsRest().catch(() => null), // 読めなかったときは null(保存済みの上書きを、知らずに消さないため)
+  ]).then(([{ goals, failed }, savedProfile, rest]) => { if (alive) start(goals, failed, savedProfile, rest); });
 
-  function start(goals, loadFailed, savedProfile) {
+  function start(goals, loadFailed, savedProfile, restLoaded) {
+    const restFailed = restLoaded === null;
+    const rest = restLoaded || {};
     const defs = shownNutrients().filter((d) => d.key in DEFAULT_GOALS);
     const inputs = defs.map((d) => {
       const input = el("input", {
@@ -31,6 +35,22 @@ export function renderGoals(root) {
       return { def: d, input };
     });
 
+    // 休養日の目標。トレ日と違う項目だけ保存する。触っていない項目は、トレ日の入力に合わせて動く
+    const restTouched = new Set(Object.keys(rest || {}));
+    const restInputs = defs.map((d) => {
+      const input = el("input", {
+        type: "number", inputmode: "decimal", min: "0.1", max: String(MAX_GOAL), step: "any",
+        value: String(rest?.[d.key] ?? goals[d.key] ?? ""), "aria-label": `${d.label}の休養日の目標(${d.unit})`,
+      });
+      input.addEventListener("focus", () => input.select());
+      input.addEventListener("input", () => restTouched.add(d.key));
+      return { def: d, input };
+    });
+    const syncRest = () => inputs.forEach(({ def, input }) => {
+      if (!restTouched.has(def.key)) restInputs.find((r) => r.def.key === def.key).input.value = input.value;
+    });
+    inputs.forEach(({ input }) => input.addEventListener("input", syncRest));
+
     const error = el("p", { class: "error", role: "alert", hidden: true });
     const saveBtn = el("button", { type: "button", class: "btn btn-big btn-primary" }, "保存する");
 
@@ -39,6 +59,11 @@ export function renderGoals(root) {
         const v = parseFloat(input.value);
         if (input.value.trim() === "") return `${def.label}を入力してください。`;
         if (!(v > 0 && v <= MAX_GOAL)) return `${def.label}は0より大きい数値(${MAX_GOAL}以下)で入力してください。`;
+      }
+      for (const { def, input } of restInputs) {
+        const v = parseFloat(input.value);
+        if (input.value.trim() === "") return `休養日の${def.label}を入力してください。`;
+        if (!(v > 0 && v <= MAX_GOAL)) return `休養日の${def.label}は0より大きい数値(${MAX_GOAL}以下)で入力してください。`;
       }
       return "";
     }
@@ -61,7 +86,16 @@ export function renderGoals(root) {
       try {
         const data = {};
         inputs.forEach(({ def, input }) => (data[def.key] = Math.round(parseFloat(input.value) * 10) / 10));
-        finish("目標値を保存しました", saveGoals(data));
+        const round1 = (input) => Math.round(parseFloat(input.value) * 10) / 10;
+        const restValues = {};
+        restInputs.forEach(({ def, input }) => (restValues[def.key] = round1(input)));
+        const overrides = diffFromBase(data, restValues); // トレ日と違う項目だけ
+        // 休養日の目標を読み込めておらず、触ってもいないときは、休養日の保存済みの設定に手を付けない
+        const touchRest = !restFailed || restTouched.size > 0;
+        finish("目標値を保存しました", Promise.all([
+          saveGoals(data),
+          ...(touchRest ? [Object.keys(overrides).length ? saveGoalsRest(overrides) : deleteGoalsRest()] : []),
+        ]));
       } catch {
         toast("保存できませんでした。", { error: true });
         saveBtn.disabled = false;
@@ -143,6 +177,7 @@ export function renderGoals(root) {
     function applyProposal() {
       if (!proposal || applyBtn.classList.contains("btn-done")) return;
       inputs.forEach(({ def, input }) => { if (def.key in proposal) input.value = String(proposal[def.key]); });
+      syncRest(); // 休養日を触っていない項目も、新しいトレ日の値に合わせる
       // 反映済みは disabled にせず(薄く読みにくくなるため)、見た目で示して再タップを無効にする
       applyBtn.classList.add("btn-done");
       applyBtn.setAttribute("aria-disabled", "true");
@@ -153,7 +188,7 @@ export function renderGoals(root) {
 
     // 未保存の変更があるまま離れようとしたら確認する(戻るリンク・下部タブ・スワイプ戻りのどれでも)。
     // 目標欄だけを開いた時点と比べる(身体情報の入力は対象外)。
-    const snapshot = () => JSON.stringify(inputs.map(({ input }) => input.value.trim()));
+    const snapshot = () => JSON.stringify([inputs, restInputs].map((list) => list.map(({ input }) => input.value.trim())));
     const initial = snapshot();
     setLeaveGuard(() => leaving || snapshot() === initial || confirm("変更が保存されていません。保存せずに移動しますか?\n(OKを押すと入力した内容は破棄されます)"));
 
@@ -178,13 +213,19 @@ export function renderGoals(root) {
         segField("目的", AIMS, "aim"),
         calcError, calcBtn, result),
       goalCard,
+      // 休養日の目標: 変えたい項目だけ違う値にする(同じ値のままの項目はトレ日と同じ扱い)
+      el("details", { class: "card", open: restTouched.size > 0 },
+        el("summary", { class: "card-summary" }, "休養日の目標"),
+        ...(restFailed ? [el("p", { class: "error", role: "alert" }, "保存済みの休養日の目標を読み込めませんでした。ここを変更しなければ、休養日の設定は変わりません。")] : []),
+        el("p", { class: "hint" }, "トレ日と違う項目だけ変えてください。変えない項目はトレ日と同じ値になります。日ごとの切り替えは、今日画面のカードの「トレ日｜休養日」で行います。"),
+        ...restInputs.map(({ def, input }) => el("label", { class: "lbl" }, `${def.label}(${def.unit})`, input))),
       error, saveBtn,
       el("button", {
         type: "button", class: "btn btn-link center reset-link",
         onclick: (e) => {
           if (!confirm("保存した目標値を捨てて、初期値に戻します。元に戻せません。よろしいですか?")) return;
           e.currentTarget.disabled = true; // 連打防止
-          finish("初期値に戻しました", deleteGoals(), "初期値への復元");
+          finish("初期値に戻しました", Promise.all([deleteGoals(), deleteGoalsRest()]), "初期値への復元");
         },
       }, "初期値に戻す"));
   }

@@ -1,6 +1,7 @@
 // 履歴画面: 7日間の棒グラフ(栄養素を切り替え可)と、日ごとの合計一覧
 import { el } from "../ui.js";
-import { watchMealsRange, getGoals } from "../db.js";
+import { watchMealsRange, getGoals, getGoalsRest, watchDaysRange, watchWeightsRange } from "../db.js";
+import { goalsForMode } from "../goals-mode.js";
 import { shownNutrients, DEFAULT_GOALS, sumNutrients, AT_LEAST } from "../nutrients.js";
 import { dateStr, shiftDate, isValidDate } from "../util.js";
 
@@ -20,15 +21,18 @@ function svg(tag, attrs = {}, text) {
   return node;
 }
 
-// 棒グラフ。目標線は破線。たんぱく質以外は目標超過を橙色+「▲」で示す(色だけに頼らない)
-function chart(def, days, goal) {
-  const hasGoal = goal > 0; // 目標が未設定の栄養素は、目標線と超過判定を出さない
-  const max = Math.max(hasGoal ? goal : 0, ...days.map((d) => d.value)) * 1.15 || 1;
+// 棒グラフ。目標線は破線。たんぱく質以外は目標超過を赤+斜線+「▲」で示す(色だけに頼らない)。
+// 目標は日ごと(d.goal。休養日は別の値になりうる)。0なら、その日は目標線と超過判定を出さない。
+function chart(def, days) {
+  const goals = days.map((d) => d.goal).filter((g) => g > 0);
+  const hasGoal = goals.length > 0;
+  const lastGoal = [...days].reverse().find((d) => d.goal > 0)?.goal ?? 0;
+  const max = Math.max(...goals, ...days.map((d) => d.value)) * 1.15 || 1;
   const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b;
   const slot = innerW / days.length, bw = slot * 0.6;
   const y = (v) => PAD.t + innerH * (1 - v / max);
   const root = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img",
-    "aria-label": `${def.label}の${days.length}日間の推移${hasGoal ? `。目標 ${goal}${def.unit}` : ""}` });
+    "aria-label": `${def.label}の${days.length}日間の推移${hasGoal ? `。目標 ${lastGoal}${def.unit}` : ""}` });
 
   // 超過の棒は色だけでなく斜線の模様でも区別する(緑と橙が見分けにくい人向け)
   const hatch = svg("pattern", { id: "over-hatch", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
@@ -39,7 +43,7 @@ function chart(def, days, goal) {
   root.append(svg("line", { x1: PAD.l, x2: W - PAD.r, y1: y(0), y2: y(0), class: "ax" }));
   days.forEach((d, i) => {
     const cx = PAD.l + slot * i + slot / 2;
-    const over = hasGoal && d.value > goal && !AT_LEAST.has(def.key);
+    const over = d.goal > 0 && d.value > d.goal && !AT_LEAST.has(def.key);
     if (d.value > 0) {
       const top = y(d.value);
       root.append(
@@ -50,13 +54,59 @@ function chart(def, days, goal) {
     const p = parts(d.date);
     root.append(
       svg("text", { x: cx, y: H - 18, class: `lab${d.isToday ? " today" : ""}`, "text-anchor": "middle" }, `${p.m}/${p.d}`),
-      svg("text", { x: cx, y: H - 5, class: `lab${d.isToday ? " today" : ""}`, "text-anchor": "middle" }, p.wd));
+      svg("text", { x: cx, y: H - 5, class: `lab${d.isToday ? " today" : ""}`, "text-anchor": "middle" }, d.rest ? `${p.wd}・休` : p.wd));
   });
-  // 目標線は棒の上に重ねる
+  // 目標線は棒の上に重ねる(日ごとの区間。同じ目標が続けば1本の線に見える)
   if (hasGoal) {
-    root.append(
-      svg("line", { x1: PAD.l, x2: W - PAD.r, y1: y(goal), y2: y(goal), class: "goal" }),
-      svg("text", { x: W - PAD.r, y: y(goal) - 3, class: "goal-lab", "text-anchor": "end" }, `目標 ${goal}`));
+    days.forEach((d, i) => {
+      if (!(d.goal > 0)) return;
+      root.append(svg("line", { x1: PAD.l + slot * i, x2: PAD.l + slot * (i + 1), y1: y(d.goal), y2: y(d.goal), class: "goal" }));
+      // 隣の日と目標が違うとき(トレ日と休養日の境)は、縦の線でつなぐ
+      const prev = days[i - 1];
+      if (prev && prev.goal > 0 && prev.goal !== d.goal) {
+        root.append(svg("line", { x1: PAD.l + slot * i, x2: PAD.l + slot * i, y1: y(prev.goal), y2: y(d.goal), class: "goal" }));
+      }
+    });
+    root.append(svg("text", { x: W - PAD.r, y: y(lastGoal) - 3, class: "goal-lab", "text-anchor": "end" }, `目標 ${lastGoal}`));
+  }
+  return root;
+}
+
+// 体重(折れ線)と摂取カロリー(棒)の推移。days: [{ date, kcal, kg|null }]
+function weightChart(days) {
+  const n = days.length;
+  const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b;
+  const slot = innerW / n, bw = Math.max(2, slot * 0.6);
+  const kcalMax = Math.max(1, ...days.map((d) => d.kcal)) * 1.1;
+  const yk = (v) => PAD.t + innerH * (1 - v / kcalMax);
+  const kgs = days.map((d) => d.kg).filter((v) => v != null);
+  let lo = Math.min(...kgs) - 0.5;
+  let hi = Math.max(...kgs) + 0.5;
+  if (!(hi > lo)) { lo = 0; hi = 1; }
+  const yw = (v) => PAD.t + innerH * (1 - (v - lo) / (hi - lo));
+  const cx = (i) => PAD.l + slot * i + slot / 2;
+  const root = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img",
+    "aria-label": kgs.length ? `体重と摂取カロリーの${n}日間の推移。体重 ${Math.min(...kgs)}〜${Math.max(...kgs)}kg` : `摂取カロリーの${n}日間の推移。体重の記録はありません` });
+  root.append(svg("line", { x1: PAD.l, x2: W - PAD.r, y1: yk(0), y2: yk(0), class: "ax" }));
+  days.forEach((d, i) => {
+    if (d.kcal > 0) root.append(svg("rect", { x: cx(i) - bw / 2, y: yk(d.kcal), width: bw, height: yk(0) - yk(d.kcal), rx: 2, class: "wbar" }));
+    // 日付の目盛り: 7日なら毎日、それより長いときは5日おき(と最終日)
+    if (n <= 7 || i % 5 === 0 || i === n - 1) {
+      const p = parts(d.date);
+      root.append(svg("text", { x: cx(i), y: H - 12, class: "lab", "text-anchor": "middle" }, `${p.m}/${p.d}`));
+    }
+  });
+  // 体重の折れ線(記録のある日だけをつなぐ)
+  const pts = days.map((d, i) => (d.kg != null ? [cx(i), yw(d.kg), d.kg] : null)).filter(Boolean);
+  if (pts.length > 1) root.append(svg("polyline", { points: pts.map(([x, y]) => `${x},${y}`).join(" "), class: "wline" }));
+  pts.forEach(([x, y]) => root.append(svg("circle", { cx: x, cy: y, r: 3.5, class: "wdot" })));
+  if (pts.length) {
+    const last = pts[pts.length - 1];
+    root.append(svg("text", { x: Math.min(last[0], W - PAD.r - 18), y: last[1] - 8, class: "val", "text-anchor": "middle" }, `${last[2]}kg`));
+    const first = pts[0];
+    if (pts.length > 1 && last[0] - first[0] > 50) {
+      root.append(svg("text", { x: Math.max(first[0], PAD.l + 14), y: first[1] - 8, class: "val", "text-anchor": "middle" }, `${first[2]}kg`));
+    }
   }
   return root;
 }
@@ -75,6 +125,11 @@ export function renderHistory(root, { query }) {
   let goals = { ...DEFAULT_GOALS };
   // 目標が届くまでは目標線と達成判定を出さない(初期値で描いてから動くのを防ぐ)
   let goalsLoaded = false;
+  let restGoals = {}; // 休養日だけ違う項目
+  let weekModes = {}; // { 日付: "training" | "rest" }(表示中の週)
+  // その日の目標(トレ日/休養日で変わる)。目標が届くまでは 0(目標なし扱い)
+  const goalOf = (date, nutrient, modes) =>
+    goalsLoaded ? goalsForMode(goals, restGoals, modes[date] || "training")[nutrient] ?? 0 : 0;
   let loaded = false;
   let failed = false;
   let alive = true;
@@ -106,20 +161,20 @@ export function renderHistory(root, { query }) {
     return Array.from({ length: 7 }, (_, i) => {
       const date = shiftDate(start, i);
       const dayMeals = meals.filter((m) => m.date === date);
-      return { date, isToday: date === today, count: dayMeals.length, total: sumNutrients(dayMeals) };
+      return { date, isToday: date === today, rest: weekModes[date] === "rest", count: dayMeals.length, total: sumNutrients(dayMeals) };
     });
   }
 
   function draw() {
     const def = defs.find((d) => d.key === key);
-    const goal = goalsLoaded ? goals[key] ?? 0 : 0;
-    const days = dayData().map((d) => ({ ...d, value: d.total[key] || 0 }));
+    const days = dayData().map((d) => ({ ...d, value: d.total[key] || 0, goal: goalOf(d.date, key, weekModes) }));
     const logged = days.filter((d) => d.count > 0);
     const avg = logged.length ? logged.reduce((s, d) => s + d.value, 0) / logged.length : 0;
-    const hasGoal = goal > 0;
+    const hasGoal = days.some((d) => d.goal > 0);
+    const avgGoal = (() => { const g = logged.filter((d) => d.goal > 0); return g.length ? g.reduce((s, d) => s + d.goal, 0) / g.length : 0; })();
     // たんぱく質・食物繊維は「目標以上」、それ以外は「目標以内」を達成とする(グラフの超過表示と一致させる)
     const atLeast = AT_LEAST.has(key);
-    const achieved = logged.filter((d) => (atLeast ? d.value >= goal : d.value <= goal)).length;
+    const achieved = logged.filter((d) => d.goal > 0 && (atLeast ? d.value >= d.goal : d.value <= d.goal)).length;
     // 週移動のリンクにも選択中の栄養素を引き継ぐ
     navLinks.forEach(({ a, target }) => a.setAttribute("href", path(target)));
 
@@ -138,10 +193,10 @@ export function renderHistory(root, { query }) {
         el("div", {}, el("span", { class: "k" }, "記録した日の平均"), el("strong", {}, loaded && logged.length ? `${avg.toFixed(def.decimals)}${def.unit}` : "—")),
         el("div", {}, el("span", { class: "k" }, atLeast ? "目標以上の日" : "目標以内の日"), el("strong", {}, loaded && hasGoal ? `${achieved} / ${logged.length}日` : "—")),
         // 週平均の達成率: 記録した日の平均が、目標の何%か
-        el("div", {}, el("span", { class: "k" }, "目標に対する平均"), el("strong", {}, loaded && hasGoal && logged.length ? `${Math.round((avg / goal) * 100)}%` : "—"))),
-      chart(def, days, goal),
+        el("div", {}, el("span", { class: "k" }, "目標に対する平均"), el("strong", {}, loaded && avgGoal > 0 && logged.length ? `${Math.round((avg / avgGoal) * 100)}%` : "—"))),
+      chart(def, days),
       // 色だけに頼らず、超過は文字でも示す(超過表示があるのは、たんぱく質以外で目標がある場合)
-      hasGoal && !atLeast ? el("p", { class: "hint chart-note" }, "▲ と斜線の棒は目標を超えた日です") : null,
+      hasGoal && !atLeast ? el("p", { class: "hint chart-note" }, "▲ と斜線の棒は目標を超えた日です(休はその日が休養日で、目標線が変わります)") : null,
       !loaded && !failed ? el("p", { class: "empty" }, "読み込み中…") : null,
       loaded && !logged.length ? el("p", { class: "empty" }, "この週の記録はありません") : null,
     ].filter(Boolean)); // replaceChildren は null を文字列「null」として表示してしまうため除く
@@ -167,20 +222,22 @@ export function renderHistory(root, { query }) {
   let calMeals = [];
   let calLoaded = false;
   let calFailed = false;
+  let calModes = {};
   let calUnwatch = null;
+  let calModesUnwatch = null;
   const calBox = el("section", { class: "card" });
 
   function drawCal() {
     const [y, m] = calMonth.split("-").map(Number);
     const daysInMonth = new Date(y, m, 0).getDate();
     const startWd = new Date(y, m - 1, 1).getDay();
-    const goal = goalsLoaded ? goals.protein ?? 0 : 0;
     const cells = [];
     for (let i = 0; i < startWd; i++) cells.push(el("span", { class: "cal-day empty-cell", "aria-hidden": "true" }));
     for (let d = 1; d <= daysInMonth; d++) {
       const date = `${calMonth}-${String(d).padStart(2, "0")}`;
       const dayMeals = calMeals.filter((x) => x.date === date);
       const protein = sumNutrients(dayMeals).protein || 0;
+      const goal = goalOf(date, "protein", calModes);
       const hit = calLoaded && !calFailed && goal > 0 && dayMeals.length > 0 && protein >= goal;
       const logged = !calFailed && dayMeals.length > 0;
       const cls = `cal-day${hit ? " hit" : logged ? " logged" : ""}${date === today ? " today" : ""}`;
@@ -202,7 +259,7 @@ export function renderHistory(root, { query }) {
         WEEKDAYS.map((w) => el("span", { class: "cal-wd", "aria-hidden": "true" }, w)),
         ...cells),
       el("div", { class: "cal-legend" },
-        el("span", {}, `✓ 目標(${goalsLoaded && goals.protein > 0 ? `${goals.protein}g` : "—"})以上`), el("span", {}, "● 記録あり"), el("span", {}, "空白 記録なし"), el("span", {}, "枠線 今日")),
+        el("span", {}, "✓ その日のたんぱく質の目標以上"), el("span", {}, "● 記録あり"), el("span", {}, "空白 記録なし"), el("span", {}, "枠線 今日")),
       !calLoaded ? el("p", { class: "hint" }, "読み込み中…") : null,
       calFailed ? el("p", { class: "error", role: "alert" }, "この月の記録を読み込めませんでした。通信状況を確認してください。") : null);
   }
@@ -213,15 +270,72 @@ export function renderHistory(root, { query }) {
     calLoaded = false;
     calFailed = false;
     if (calUnwatch) calUnwatch();
+    if (calModesUnwatch) calModesUnwatch();
+    calModes = {};
     const [y, m] = ym.split("-").map(Number);
+    // 休養日の判定(その日の目標が変わる)のため、同じ月のモードも読む
+    calModesUnwatch = watchDaysRange(`${ym}-01`, dateStr(new Date(y, m, 0)), (modes) => { if (alive) { calModes = modes; drawCal(); } }, () => {});
     calUnwatch = watchMealsRange(`${ym}-01`, dateStr(new Date(y, m, 0)),
       (data) => { if (!alive) return; calMeals = data; calLoaded = true; calFailed = false; drawCal(); },
       () => { if (alive) { calLoaded = true; calFailed = true; drawCal(); } });
     drawCal();
   }
 
-  root.append(...[el("h1", {}, "履歴"), nav, toLatest, notice, tabs, chartBox, list, calBox].filter(Boolean));
+  // ---- 体重と摂取カロリーの推移(表示中の週の最終日までの7日 / 30日) ----
+  let wRange = 7;
+  let wMeals = [];
+  let wWeights = {};
+  let wLoaded = false;
+  let wFailed = false;
+  let wUnwatch = [];
+  const wBox = el("section", { class: "card" });
+
+  function drawWeightCard() {
+    const wStart = shiftDate(end, -(wRange - 1));
+    const days = Array.from({ length: wRange }, (_, i) => {
+      const date = shiftDate(wStart, i);
+      return { date, kcal: sumNutrients(wMeals.filter((m) => m.date === date)).kcal || 0, kg: wWeights[date] ?? null };
+    });
+    const recorded = days.filter((d) => d.kg != null);
+    const change = recorded.length >= 2 ? Math.round((recorded[recorded.length - 1].kg - recorded[0].kg) * 10) / 10 : null;
+    wBox.replaceChildren(...[
+      el("h2", {}, "体重と摂取カロリー"),
+      el("div", { class: "segs" }, [[7, "7日"], [30, "30日"]].map(([n, label]) => {
+        const b = el("button", { type: "button", class: `seg${wRange === n ? " on" : ""}`, "aria-pressed": String(wRange === n) }, label);
+        b.addEventListener("click", () => { if (wRange !== n) { wRange = n; setWeightRange(); } });
+        return b;
+      })),
+      wFailed ? el("p", { class: "error", role: "alert" }, "体重を読み込めませんでした。通信状況を確認してください。")
+        : !wLoaded ? el("p", { class: "empty" }, "読み込み中…")
+        : recorded.length === 0 ? el("p", { class: "empty" }, "この期間の体重の記録はありません。今日の画面から記録できます。")
+        : el("div", { class: "chart-sum" },
+          el("div", {}, el("span", { class: "k" }, "最新"), el("strong", {}, `${recorded[recorded.length - 1].kg}kg`)),
+          el("div", {}, el("span", { class: "k" }, `${wRange}日間の変化`), el("strong", {}, change == null ? "—" : `${change > 0 ? "+" : ""}${change}kg`))),
+      wLoaded && !wFailed && recorded.length ? weightChart(days) : null,
+      wLoaded && !wFailed && recorded.length
+        ? el("div", { class: "cal-legend" }, el("span", {}, el("i", { class: "lg-dot" }), "体重(kg)"), el("span", {}, el("i", { class: "lg-bar" }), "摂取カロリー"))
+        : null,
+    ].filter(Boolean));
+  }
+
+  function setWeightRange() {
+    wUnwatch.forEach((f) => f());
+    wMeals = []; wWeights = {}; wLoaded = false; wFailed = false;
+    const wStart = shiftDate(end, -(wRange - 1));
+    let mealsReady = false;
+    let weightsReady = false;
+    const settle = () => { wLoaded = mealsReady && weightsReady; drawWeightCard(); };
+    wUnwatch = [
+      watchMealsRange(wStart, end, (data) => { if (!alive) return; wMeals = data; mealsReady = true; wFailed = false; settle(); }, () => { if (alive) { wFailed = true; drawWeightCard(); } }),
+      watchWeightsRange(wStart, end, (data) => { if (!alive) return; wWeights = data; weightsReady = true; wFailed = false; settle(); }, () => { if (alive) { wFailed = true; drawWeightCard(); } }),
+    ];
+    drawWeightCard();
+  }
+  const unwatchWeight = () => wUnwatch.forEach((f) => f());
+
+  root.append(...[el("h1", {}, "履歴"), nav, toLatest, notice, tabs, chartBox, wBox, list, calBox].filter(Boolean));
   draw();
+  setWeightRange();
   setMonth(calMonth);
 
   const unwatch = watchMealsRange(
@@ -235,10 +349,15 @@ export function renderHistory(root, { query }) {
       draw();
     });
 
-  // 取得できなかったときは初期値の目標で表示する
-  getGoals(DEFAULT_GOALS)
-    .then((g) => { goals = g; }, () => {})
+  // 取得できなかったときは初期値の目標で表示する(休養日の上書きが読めなければ、トレ日と同じ)
+  Promise.all([getGoals(DEFAULT_GOALS).then((g) => { goals = g; }, () => {}), getGoalsRest().then((r) => { restGoals = r; }, () => {})])
     .then(() => { if (alive) { goalsLoaded = true; draw(); drawCal(); } });
 
-  return () => { alive = false; unwatch(); if (calUnwatch) calUnwatch(); };
+  const unwatchWeekDays = watchDaysRange(start, end, (modes) => { if (alive) { weekModes = modes; draw(); } }, () => {});
+
+  return () => {
+    alive = false; unwatch(); unwatchWeekDays(); unwatchWeight();
+    if (calUnwatch) calUnwatch();
+    if (calModesUnwatch) calModesUnwatch();
+  };
 }

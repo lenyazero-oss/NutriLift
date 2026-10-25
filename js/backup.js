@@ -16,10 +16,13 @@ export const COLLECTIONS = [
   { key: "unitOverrides", label: "単位の設定" },
   // optional: 後から追加した項目。古いバックアップにはないので、ファイルに無ければ「含まれない」として触らない
   { key: "displayNames", label: "表示名", optional: true },
+  { key: "weights", label: "体重", optional: true },
+  { key: "days", label: "トレ日/休養日", optional: true },
 ];
 export const SINGLES = [
   { key: "goals", label: "目標値" },
   { key: "profile", label: "身体情報" },
+  { key: "goalsRest", label: "休養日の目標", optional: true },
 ];
 
 // ---- Timestamp の変換 ----
@@ -94,6 +97,21 @@ const VALIDATORS = {
     if (!optTs(d, "createdAt") || !optTs(d, "updatedAt")) return "日時が正しくありません";
     return "";
   },
+  // 日付がドキュメントIDと同じで、実在する日付であること
+  weights(d, id) {
+    if (!keysOk(d, ["date", "kg", "updatedAt"], ["date", "kg"])) return "項目が不足しているか、余分な項目があります";
+    if (d.date !== id || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return "日付が正しくありません";
+    if (!num(d.kg, 20, 400)) return "体重が正しくありません";
+    if (!optTs(d, "updatedAt")) return "日時が正しくありません";
+    return "";
+  },
+  days(d, id) {
+    if (!keysOk(d, ["date", "mode", "updatedAt"], ["date", "mode"])) return "項目が不足しているか、余分な項目があります";
+    if (d.date !== id || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return "日付が正しくありません";
+    if (!["training", "rest"].includes(d.mode)) return "モードが正しくありません";
+    if (!optTs(d, "updatedAt")) return "日時が正しくありません";
+    return "";
+  },
   displayNames(d) {
     if (!keysOk(d, ["name", "updatedAt"], ["name"])) return "項目が不足しているか、余分な項目があります";
     if (!str(d.name, 100)) return "表示名が正しくありません";
@@ -164,18 +182,19 @@ export function parseBackup(text) {
       if (!validId(id)) return { error: `${where}: IDが正しくありません。` };
       if (seen.has(id)) return { error: `${where}: IDが重複しています。` };
       seen.add(id);
-      const problem = VALIDATORS[key](data);
+      const problem = VALIDATORS[key](data, id);
       if (problem) return { error: `${where}: ${problem}。` };
       if (JSON.stringify(data).length > MAX_DOC_CHARS) return { error: `${where}: データが大きすぎます。` };
       collections[key].push({ id, data });
     }
   }
   const singles = {};
-  for (const { key, label } of SINGLES) {
+  for (const { key, label, optional } of SINGLES) {
+    if (optional && !(key in b.data)) { singles[key] = undefined; continue; } // 古いバックアップ: この項目は含まれない
     if (!(key in b.data)) return { error: `${label}がファイルにありません。` };
     const d = b.data[key];
     if (d !== null && !isObj(d)) return { error: `${label}の形式が正しくありません。` };
-    const problem = d ? VALIDATORS[key](d) : "";
+    const problem = d ? (VALIDATORS[key] || VALIDATORS.goals)(d) : ""; // 休養日の目標は目標値と同じ形式
     if (problem) return { error: `${label}: ${problem}。` };
     singles[key] = d;
   }
@@ -222,6 +241,7 @@ export function planImport(file, current, mode) {
     compare(label, key, file.collections[key], current.collections[key]);
   }
   for (const { key, label } of SINGLES) {
+    if (file.singles[key] === undefined) continue; // ファイルに含まれない項目は触らない
     const f = file.singles[key];
     const c = current.singles[key];
     compare(label, "settings",
