@@ -10,6 +10,7 @@ import { SLOTS, dateStr, guessSlot } from "../util.js";
 
 const slotLabel = (key) => SLOTS.find((s) => s.key === key)?.label ?? "";
 const round1 = (v) => Math.round(v * 10) / 10;
+const MAX_PORTIONS = 100; // 人前数の上限(巨大な値だと grams が firestore.rules の上限を超えて保存できない)
 
 // 並び替え。最近使った順は、食事の記録(直近60日)から決める
 const SORTS = [
@@ -89,18 +90,18 @@ function recipeCard(recipe, st) {
   let portions = st.portions ?? 1;
   let slot = st.slot ?? guessSlot();
   const portionInput = el("input", {
-    type: "number", inputmode: "decimal", min: "0", step: "any", value: String(portions), "aria-label": "人前",
+    type: "number", inputmode: "decimal", min: "0", max: String(MAX_PORTIONS), step: "any", value: String(portions), "aria-label": "人前",
   });
   // portions は常に「直近の有効な値」。入力途中の不正値では更新しない
   portionInput.addEventListener("input", () => {
     const v = parseFloat(portionInput.value);
-    if (v > 0) { portions = v; st.portions = v; }
+    if (v > 0 && v <= MAX_PORTIONS) { portions = v; st.portions = v; }
   });
   portionInput.addEventListener("blur", () => { portionInput.value = String(portions); });
   portionInput.addEventListener("focus", () => portionInput.select());
   const step = (delta) => () => {
     const current = parseFloat(portionInput.value) > 0 ? parseFloat(portionInput.value) : portions;
-    portions = Math.max(0.5, Math.round((current + delta) * 10) / 10);
+    portions = Math.min(MAX_PORTIONS, Math.max(0.5, Math.round((current + delta) * 10) / 10));
     st.portions = portions;
     portionInput.value = String(portions);
   };
@@ -120,7 +121,7 @@ function recipeCard(recipe, st) {
   dateInput.addEventListener("change", () => { st.date = dateInput.value; });
   const goBtn = el("button", { type: "button", class: "btn btn-primary" }, "この内容で記録する");
   goBtn.addEventListener("click", () => {
-    if (!(portions > 0)) return toast("人前を入力してください");
+    if (!(portions > 0 && portions <= MAX_PORTIONS)) return toast(`人前は${MAX_PORTIONS}以下で入力してください`);
     if (!dateInput.value) return toast("日付を入力してください");
     recordRecipe(recipe, portions, dateInput.value, slot);
     panel.hidden = true;

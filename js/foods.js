@@ -1,6 +1,7 @@
 // 食材データ(foods.json)の読み込み、端末内検索、単位の解決。
 let foods = []; // { id, name, norm, n, source, units? }
-let defaultRules = [];
+let defaultRules = []; // { units, match, exclude }(match / exclude は正規化済み)
+const defaultUnitsCache = new Map(); // 食材ID → 初期ルールで決まる単位(ルールは読み込み後に変わらない)
 let overrides = {};
 let loaded = false;
 
@@ -33,7 +34,13 @@ export async function loadFoods() {
     fetchJson("./data/default-units.json", false),
   ]);
   foods = data.foods.map((f) => ({ ...f, norm: normalize(f.name), fold: fold(f.name), source: "table" }));
-  defaultRules = units?.rules || [];
+  // 照合に使う語は読み込み時に一度だけ正規化しておく(unitsFor を呼ぶたびにやり直さない)
+  defaultRules = (units?.rules || []).map((r) => ({
+    units: r.units,
+    match: (r.match || []).map(normalize),
+    exclude: (r.exclude || []).map(normalize),
+  }));
+  defaultUnitsCache.clear();
   loaded = true;
   applyCustomFoods(); // 先にユーザーデータが届いていた場合も、自作食材を失わない
 }
@@ -191,10 +198,13 @@ export function unitsFor(food) {
   const valid = (list) => (list || []).filter((u) => u && u.name && Number.isFinite(u.g) && u.g > 0);
   if (food.source === "custom") return valid(food.units);
   if (overrides[food.id]) return valid(overrides[food.id]);
-  for (const rule of defaultRules) {
-    const matched = rule.match.every((k) => food.norm.includes(normalize(k)));
-    const excluded = (rule.exclude || []).some((k) => food.norm.includes(normalize(k)));
-    if (matched && !excluded) return rule.units;
+  let found = defaultUnitsCache.get(food.id);
+  if (!found) {
+    // match が空のルールは全食材に当たってしまうので除く
+    const rule = defaultRules.find((r) =>
+      r.match.length > 0 && r.match.every((k) => food.norm.includes(k)) && !r.exclude.some((k) => food.norm.includes(k)));
+    found = rule ? rule.units : [];
+    defaultUnitsCache.set(food.id, found);
   }
-  return [];
+  return found;
 }
