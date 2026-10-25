@@ -136,7 +136,9 @@ export function renderHistory(root, { query }) {
     chartBox.replaceChildren(...[
       el("div", { class: "chart-sum" },
         el("div", {}, el("span", { class: "k" }, "記録した日の平均"), el("strong", {}, loaded && logged.length ? `${avg.toFixed(def.decimals)}${def.unit}` : "—")),
-        el("div", {}, el("span", { class: "k" }, atLeast ? "目標以上の日" : "目標以内の日"), el("strong", {}, loaded && hasGoal ? `${achieved} / ${logged.length}日` : "—"))),
+        el("div", {}, el("span", { class: "k" }, atLeast ? "目標以上の日" : "目標以内の日"), el("strong", {}, loaded && hasGoal ? `${achieved} / ${logged.length}日` : "—")),
+        // 週平均の達成率: 記録した日の平均が、目標の何%か
+        el("div", {}, el("span", { class: "k" }, "目標に対する平均"), el("strong", {}, loaded && hasGoal && logged.length ? `${Math.round((avg / goal) * 100)}%` : "—"))),
       chart(def, days, goal),
       // 色だけに頼らず、超過は文字でも示す(超過表示があるのは、たんぱく質以外で目標がある場合)
       hasGoal && !atLeast ? el("p", { class: "hint chart-note" }, "▲ と斜線の棒は目標を超えた日です") : null,
@@ -158,8 +160,69 @@ export function renderHistory(root, { query }) {
       })));
   }
 
-  root.append(...[el("h1", {}, "履歴"), nav, toLatest, notice, tabs, chartBox, list].filter(Boolean));
+  // ---- たんぱく質の達成日カレンダー(月単位。表示中の週とは別に、月を移動できる) ----
+  const monthOf = (d) => d.slice(0, 7);
+  const shiftMonth = (ym, delta) => { const [y, m] = ym.split("-").map(Number); return dateStr(new Date(y, m - 1 + delta, 1)).slice(0, 7); };
+  let calMonth = monthOf(end);
+  let calMeals = [];
+  let calLoaded = false;
+  let calFailed = false;
+  let calUnwatch = null;
+  const calBox = el("section", { class: "card" });
+
+  function drawCal() {
+    const [y, m] = calMonth.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const startWd = new Date(y, m - 1, 1).getDay();
+    const goal = goalsLoaded ? goals.protein ?? 0 : 0;
+    const cells = [];
+    for (let i = 0; i < startWd; i++) cells.push(el("span", { class: "cal-day empty-cell", "aria-hidden": "true" }));
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = `${calMonth}-${String(d).padStart(2, "0")}`;
+      const dayMeals = calMeals.filter((x) => x.date === date);
+      const protein = sumNutrients(dayMeals).protein || 0;
+      const hit = calLoaded && !calFailed && goal > 0 && dayMeals.length > 0 && protein >= goal;
+      const logged = !calFailed && dayMeals.length > 0;
+      const cls = `cal-day${hit ? " hit" : logged ? " logged" : ""}${date === today ? " today" : ""}`;
+      const state = hit ? "目標達成" : logged ? "記録あり" : "記録なし";
+      const inner = [String(d), el("span", { class: "cal-mark", "aria-hidden": "true" }, hit ? "✓" : logged ? "●" : "\u00a0")];
+      cells.push(date > today
+        ? el("span", { class: `${cls} future`, "aria-hidden": "true" }, ...inner)
+        : el("a", { class: cls, href: `#/today?date=${date}`, "aria-label": `${m}月${d}日 ${state}` }, ...inner));
+    }
+    calBox.replaceChildren(
+      el("h2", {}, "たんぱく質の達成カレンダー"),
+      el("div", { class: "cal-head" },
+        el("button", { type: "button", class: "navbtn", "aria-label": "前の月", onclick: () => setMonth(shiftMonth(calMonth, -1)) }, "‹"),
+        el("strong", {}, `${y}年${m}月`),
+        calMonth >= monthOf(today)
+          ? el("span", { class: "navbtn disabled", "aria-hidden": "true" }, "›")
+          : el("button", { type: "button", class: "navbtn", "aria-label": "次の月", onclick: () => setMonth(shiftMonth(calMonth, 1)) }, "›")),
+      el("div", { class: "cal-grid" },
+        WEEKDAYS.map((w) => el("span", { class: "cal-wd", "aria-hidden": "true" }, w)),
+        ...cells),
+      el("div", { class: "cal-legend" },
+        el("span", {}, `✓ 目標(${goalsLoaded && goals.protein > 0 ? `${goals.protein}g` : "—"})以上`), el("span", {}, "● 記録あり"), el("span", {}, "空白 記録なし"), el("span", {}, "枠線 今日")),
+      !calLoaded ? el("p", { class: "hint" }, "読み込み中…") : null,
+      calFailed ? el("p", { class: "error", role: "alert" }, "この月の記録を読み込めませんでした。通信状況を確認してください。") : null);
+  }
+
+  function setMonth(ym) {
+    calMonth = ym;
+    calMeals = [];
+    calLoaded = false;
+    calFailed = false;
+    if (calUnwatch) calUnwatch();
+    const [y, m] = ym.split("-").map(Number);
+    calUnwatch = watchMealsRange(`${ym}-01`, dateStr(new Date(y, m, 0)),
+      (data) => { if (!alive) return; calMeals = data; calLoaded = true; calFailed = false; drawCal(); },
+      () => { if (alive) { calLoaded = true; calFailed = true; drawCal(); } });
+    drawCal();
+  }
+
+  root.append(...[el("h1", {}, "履歴"), nav, toLatest, notice, tabs, chartBox, list, calBox].filter(Boolean));
   draw();
+  setMonth(calMonth);
 
   const unwatch = watchMealsRange(
     start, end,
@@ -175,7 +238,7 @@ export function renderHistory(root, { query }) {
   // 取得できなかったときは初期値の目標で表示する
   getGoals(DEFAULT_GOALS)
     .then((g) => { goals = g; }, () => {})
-    .then(() => { if (alive) { goalsLoaded = true; draw(); } });
+    .then(() => { if (alive) { goalsLoaded = true; draw(); drawCal(); } });
 
-  return () => { alive = false; unwatch(); };
+  return () => { alive = false; unwatch(); if (calUnwatch) calUnwatch(); };
 }

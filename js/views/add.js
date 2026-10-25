@@ -1,6 +1,6 @@
 // 食事追加: 食材検索 → グラム、または 単位×数量 → 記録
 import { el, toast, writeFailed } from "../ui.js";
-import { loadFoods, searchFoods, unitsFor, displayName } from "../foods.js";
+import { loadFoods, searchFoods, unitsFor, displayName, findFood } from "../foods.js";
 import { ensureUserData } from "../food-picker.js";
 import { loadUsage, recordUsage } from "../usage.js";
 import { addMeal, deleteMeal } from "../db.js";
@@ -229,6 +229,15 @@ export function renderAdd(root, { query }) {
     // 成分表が読めた時点で検索を有効にする(Firestoreの取得は待たない)
     status.hidden = true;
     search.disabled = false;
+    // 不足分の提案などから開いたときは、その食材を選んだ状態にする(?food=table:01001)。
+    // 成分表の食材はすぐ選べる。自作食材は、ユーザーデータの取得後に選ぶ。検索欄に入力済みなら上書きしない
+    const preselect = () => {
+      if (!query.food || selected || search.value.trim()) return;
+      const i = query.food.indexOf(":");
+      const f = i > 0 ? findFood(query.food.slice(i + 1), query.food.slice(0, i)) : null;
+      if (f) select(f);
+    };
+    preselect();
     // 自動フォーカスはしない(キーボードで「最近」「よく使う」の食材が隠れるため。検索欄をタップして入力)
     try {
       await ensureUserData(); // 食材マスタと共通のキャッシュ(編集時に無効化される)
@@ -238,5 +247,6 @@ export function renderAdd(root, { query }) {
       status.textContent = "自作食材と単位の設定を読み込めませんでした(成分表の食材は検索できます)。";
     }
     refreshQuick(); // 自作食材も解決できるよう、ユーザーデータのあとに集計する
+    preselect();
   })();
 }

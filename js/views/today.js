@@ -8,7 +8,8 @@ import { copyMeals, mealsInSlot, mealsToRecipeItems, saveMealsAsSet } from "../c
 import { navigate } from "../router.js";
 import { currentUid } from "../auth.js";
 import { shownNutrients, DEFAULT_GOALS, sumNutrients, AT_LEAST, scale, formatValue } from "../nutrients.js";
-import { SLOTS, dateStr, shiftDate, isValidDate } from "../util.js";
+import { suggestProtein } from "../suggest.js";
+import { SLOTS, dateStr, shiftDate, isValidDate, guessSlot } from "../util.js";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -62,6 +63,46 @@ function bar(def, value, goal, { big = false, mode = "intake" } = {}) {
     el("div", { class: "bar-sub" }, remain > 0 ? `あと ${remain.toFixed(def.decimals)}${def.unit}` : "目標達成"));
 }
 
+// PFCバランス: たんぱく質・脂質・炭水化物のカロリー比率(P×4、F×9、C×4)。食べた分が0なら出さない
+function pfcBlock(total) {
+  const kcal = { p: (total.protein || 0) * 4, f: (total.fat || 0) * 9, c: (total.carb || 0) * 4 };
+  const sum = kcal.p + kcal.f + kcal.c;
+  if (sum <= 0) return null;
+  const pctP = Math.round((kcal.p / sum) * 100);
+  const pctF = Math.round((kcal.f / sum) * 100);
+  const pct = { p: pctP, f: pctF, c: Math.max(0, 100 - pctP - pctF) }; // 合計が100%になるよう、炭水化物で調整
+  const names = { p: "たんぱく質", f: "脂質", c: "炭水化物" };
+  return el("div", { class: "pfc" },
+    el("div", { class: "pfc-title" }, "PFCバランス(カロリー比)"),
+    el("div", { class: "pfc-bar", "aria-hidden": "true" }, // 凡例に同じ内容が文字であるので、読み上げは凡例だけ
+      ["p", "f", "c"].map((k) => el("span", { class: `pfc-${k}`, style: `flex:${kcal[k]}` }))),
+    el("div", { class: "pfc-legend" },
+      ["p", "f", "c"].map((k) => el("span", {}, el("i", { class: `pfc-${k}` }), `${names[k]} ${pct[k]}%`))));
+}
+
+// 1食あたりのたんぱく質の目安(g)。これを下回る/上回る食事は「少なめ」「多め」
+const MEAL_PROTEIN = { low: 20, high: 40 };
+// 表示は整数のグラムなので、判定も整数に丸めた値で行う(19.6g → 「20g」なら「適量」)
+const proteinState = (p0) => { const p = Math.round(p0); return (p < MEAL_PROTEIN.low ? ["少なめ", "mp-low"] : p <= MEAL_PROTEIN.high ? ["適量", "mp-good"] : ["多め", "mp-high"]); };
+
+// 食事ごとのたんぱく質の分散。間食は目安の対象にしない
+function mealProteinBlock(meals) {
+  return el("div", { class: "meal-protein" },
+    el("div", { class: "pfc-title" }, `1食あたりのたんぱく質(目安 ${MEAL_PROTEIN.low}〜${MEAL_PROTEIN.high}g)`),
+    el("div", { class: "meal-protein-row" }, SLOTS.map((s) => {
+      const items = meals.filter((m) => m.slot === s.key);
+      const p = sumNutrients(items).protein || 0;
+      const judged = s.key !== "snack" && items.length > 0;
+      const [state, cls] = judged ? proteinState(p) : ["", ""];
+      return el("div", { class: "mp-cell", "aria-label": `${s.label} たんぱく質${items.length ? `${p.toFixed(0)}g ${state}` : "なし"}` },
+        s.label,
+        el("strong", {}, items.length ? `${p.toFixed(0)}g` : "—"),
+        el("div", { class: "mp-track" }, el("div", { class: "mp-fill", style: `width:${Math.min(p / MEAL_PROTEIN.high, 1) * 100}%` })),
+        el("span", { class: cls }, state || "\u00a0"));
+    })),
+    el("div", { class: "hint" }, "間食は目安の対象外です。"));
+}
+
 export function renderToday(root, { query }) {
   const date = isValidDate(query.date) ? query.date : dateStr();
   const isToday = date === dateStr();
@@ -108,7 +149,47 @@ export function renderToday(root, { query }) {
         })),
       bar(protein, total.protein || 0, goals.protein, { big: true, mode: summaryMode }),
       el("div", { class: "bars" },
-        defs.filter((d) => d.key !== "protein").map((d) => bar(d, total[d.key] || 0, goals[d.key] ?? 0, { mode: summaryMode }))));
+        defs.filter((d) => d.key !== "protein").map((d) => bar(d, total[d.key] || 0, goals[d.key] ?? 0, { mode: summaryMode }))),
+    );
+    refreshSuggest();
+  }
+
+  // 食事一覧の下のカード: PFCバランスと1食あたりのたんぱく質。上部カードを短く保ち、1日の記録を先に見せる
+  const distBody = el("div");
+  const distBox = el("details", { class: "card dist", open: true },
+    el("summary", {}, "PFCバランスと1食あたりのたんぱく質"), distBody);
+  function drawDist() {
+    distBody.replaceChildren(...[pfcBlock(sumNutrients(meals)), mealProteinBlock(meals)].filter(Boolean));
+  }
+
+  // 不足分の提案(今日だけ): 残りのたんぱく質を、よく使う食材で補う量。タップでその食材の追加画面へ
+  const suggestBox = el("section", { class: "suggest", hidden: true });
+  let suggestSeq = 0;
+  let suggestKey = ""; // 前回と同じ提案なら、表示を作り直さない(摂取量/残りの切替でちらつかないように)
+  let goalsReady = false;
+  async function refreshSuggest() {
+    const seq = ++suggestSeq;
+    const remain = (goals.protein || 0) - (sumNutrients(meals).protein || 0);
+    // 目標が届くまでは出さない(初期値の目標で一瞬出てから差し替わるのを防ぐ)
+    if (!isToday || !loaded || !goalsReady || !(remain >= 5)) { suggestBox.hidden = true; return; }
+    try {
+      await loadFoods();
+      await ensureUserData().catch(() => {});
+      const list = await suggestProtein(remain);
+      if (!alive || seq !== suggestSeq) return;
+      if (!list.length) { suggestBox.hidden = true; return; }
+      const slotKey = guessSlot();
+      const key = `${remain.toFixed(0)}|${list.map((s) => s.text).join("|")}`;
+      if (key === suggestKey && !suggestBox.hidden) return;
+      suggestKey = key;
+      const slotName = SLOTS.find((x) => x.key === slotKey)?.label ?? "";
+      suggestBox.replaceChildren(
+        el("span", { class: "suggest-lead" }, `あと${remain.toFixed(0)}g:`),
+        ...list.map((s) =>
+          el("a", { class: "suggest-link", href: `#/add?date=${date}&slot=${slotKey}&food=${s.food.source}:${encodeURIComponent(s.food.id)}` }, s.text)),
+        el("span", { class: "suggest-note" }, `タップで${slotName}に追加`));
+      suggestBox.hidden = false;
+    } catch { suggestBox.hidden = true; } // 提案できなくても、画面の他の部分には影響しない
   }
 
   function removeMeal(m) {
@@ -341,7 +422,9 @@ export function renderToday(root, { query }) {
             el("a", { class: "btn add-inline", href, "aria-label": `${s.label}に追加` }, "＋ 追加"));
         }
         return el("section", { class: "card slot" },
-          el("div", { class: "slot-head" }, el("h2", {}, s.label), sum),
+          el("div", { class: "slot-head" },
+            el("h2", {}, s.label, s.key !== "snack" ? el("span", { class: `protein-chip ${proteinState(t.protein || 0)[1]}` }, proteinState(t.protein || 0)[0]) : null),
+            sum),
           el("ul", { class: "meals" }, items.map(mealRow)),
           el("a", { class: "btn add-btn", href }, `＋ ${s.label}に追加`),
           // 2品以上の食事だけ、セットにできる(1品だけのセットは意味が薄く、カードも煩雑になる)
@@ -353,10 +436,10 @@ export function renderToday(root, { query }) {
       ...(meals.length && showHint ? [el("p", { class: "hint swipe-hint" }, "記録は左にスワイプで削除、タップで量を変更できます。")] : []));
   }
 
-  const redraw = () => { drawSummary(); drawList(); };
+  const redraw = () => { drawSummary(); drawList(); drawDist(); };
 
   // append に null を渡すと「null」という文字が出るため、存在するものだけ渡す
-  root.append(...[nav, toTodayLink, notice, summary, list].filter(Boolean));
+  root.append(...[nav, toTodayLink, notice, summary, suggestBox, list, distBox].filter(Boolean));
   redraw();
 
   const unwatch = watchMeals(
@@ -377,8 +460,8 @@ export function renderToday(root, { query }) {
     .catch(() => {}); // 取得できなければコピーのボタンを出さないだけ
 
   getGoals(DEFAULT_GOALS)
-    .then((g) => { if (alive) { goals = g; drawSummary(); } })
-    .catch(() => {}); // 取得できなければ初期値のまま表示
+    .then((g) => { if (alive) { goals = g; goalsReady = true; drawSummary(); } })
+    .catch(() => { goalsReady = true; }); // 取得できなければ初期値のまま表示
 
   return () => { alive = false; unwatch(); };
 }
