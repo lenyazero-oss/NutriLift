@@ -60,15 +60,6 @@ service cloud.firestore {
         && d.get('updatedAt', request.time) is timestamp;
     }
 
-    // 日ごとのモード(トレ日/休養日): days/{日付} = { date, mode }
-    function validDay(d, id) {
-      return d.keys().hasOnly(['date', 'mode', 'updatedAt'])
-        && d.keys().hasAll(['date', 'mode'])
-        && d.date == id && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-        && d.mode in ['training', 'rest']
-        && d.get('updatedAt', request.time) is timestamp;
-    }
-
     // 体重: weights/{日付} = { date, kg }
     function validWeight(d, id) {
       return d.keys().hasOnly(['date', 'kg', 'updatedAt'])
@@ -127,10 +118,6 @@ service cloud.firestore {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validCustomFood(request.resource.data);
       }
-      match /days/{id} {
-        allow read, delete: if isOwner(uid);
-        allow create, update: if isOwner(uid) && validDay(request.resource.data, id);
-      }
       match /weights/{id} {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validWeight(request.resource.data, id);
@@ -144,11 +131,6 @@ service cloud.firestore {
         allow create, update: if isOwner(uid) && validUnitOverride(request.resource.data);
       }
       match /settings/goals {
-        allow read, delete: if isOwner(uid);
-        allow create, update: if isOwner(uid) && validGoals(request.resource.data);
-      }
-      // 休養日の目標: トレ日と違う項目だけ。キーと値の条件は goals と同じ
-      match /settings/goalsRest {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validGoals(request.resource.data);
       }

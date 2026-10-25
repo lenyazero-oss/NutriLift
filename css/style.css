@@ -109,7 +109,6 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 .row2 select { flex: 1.4; min-width: 0; }
 .preview { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
 .preview-g { font-size: 20px; font-weight: 700; }
-.card-summary { font-size: 18px; font-weight: 700; min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 .calc-card summary { font-size: 18px; font-weight: 700; min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 .calc-card[open] summary { margin-bottom: 4px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -202,7 +201,7 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 .hint.swipe-hint { margin: 0 0 8px; }
 /* 摂取量/残り量の切り替え */
 .summary { position: relative; cursor: pointer; }
-.mode-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+.mode-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-bottom: 6px; }
 .mode-seg { display: flex; gap: 4px; }
 .mode-btn {
   min-height: 44px; padding: 0 8px; font-size: 13px; font-weight: 600; color: var(--text-sub);
@@ -212,7 +211,6 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 .weight-card h2 { margin: 0 0 6px; font-size: 16px; }
 .weight-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .weight-row .btn-link { min-height: 44px; padding: 0 10px; }
-.mode-note { margin: 0 0 8px; font-size: 13px; color: var(--text-sub); }
 .lg-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 4px; }
 .lg-bar { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--pfc-c); opacity: 0.5; margin-right: 4px; }
 .weight-row input { margin: 0; flex: 1 1 90px; min-width: 0; }

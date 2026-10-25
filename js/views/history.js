@@ -1,7 +1,6 @@
 // 履歴画面: 7日間の棒グラフ(栄養素を切り替え可)と、日ごとの合計一覧
 import { el } from "../ui.js";
-import { watchMealsRange, getGoals, getGoalsRest, watchDaysRange, watchWeightsRange } from "../db.js";
-import { goalsForMode } from "../goals-mode.js";
+import { watchMealsRange, getGoals, watchWeightsRange } from "../db.js";
 import { shownNutrients, DEFAULT_GOALS, sumNutrients, AT_LEAST } from "../nutrients.js";
 import { dateStr, shiftDate, isValidDate } from "../util.js";
 
@@ -22,7 +21,7 @@ function svg(tag, attrs = {}, text) {
 }
 
 // 棒グラフ。目標線は破線。たんぱく質以外は目標超過を赤+斜線+「▲」で示す(色だけに頼らない)。
-// 目標は日ごと(d.goal。休養日は別の値になりうる)。0なら、その日は目標線と超過判定を出さない。
+// 目標は日ごとの値(d.goal)を持つ。0なら、その日は目標線と超過判定を出さない。
 function chart(def, days) {
   const goals = days.map((d) => d.goal).filter((g) => g > 0);
   const hasGoal = goals.length > 0;
@@ -54,18 +53,13 @@ function chart(def, days) {
     const p = parts(d.date);
     root.append(
       svg("text", { x: cx, y: H - 18, class: `lab${d.isToday ? " today" : ""}`, "text-anchor": "middle" }, `${p.m}/${p.d}`),
-      svg("text", { x: cx, y: H - 5, class: `lab${d.isToday ? " today" : ""}`, "text-anchor": "middle" }, d.rest ? `${p.wd}・休` : p.wd));
+      svg("text", { x: cx, y: H - 5, class: `lab${d.isToday ? " today" : ""}`, "text-anchor": "middle" }, p.wd));
   });
   // 目標線は棒の上に重ねる(日ごとの区間。同じ目標が続けば1本の線に見える)
   if (hasGoal) {
     days.forEach((d, i) => {
       if (!(d.goal > 0)) return;
       root.append(svg("line", { x1: PAD.l + slot * i, x2: PAD.l + slot * (i + 1), y1: y(d.goal), y2: y(d.goal), class: "goal" }));
-      // 隣の日と目標が違うとき(トレ日と休養日の境)は、縦の線でつなぐ
-      const prev = days[i - 1];
-      if (prev && prev.goal > 0 && prev.goal !== d.goal) {
-        root.append(svg("line", { x1: PAD.l + slot * i, x2: PAD.l + slot * i, y1: y(prev.goal), y2: y(d.goal), class: "goal" }));
-      }
     });
     root.append(svg("text", { x: W - PAD.r, y: y(lastGoal) - 3, class: "goal-lab", "text-anchor": "end" }, `目標 ${lastGoal}`));
   }
@@ -125,11 +119,8 @@ export function renderHistory(root, { query }) {
   let goals = { ...DEFAULT_GOALS };
   // 目標が届くまでは目標線と達成判定を出さない(初期値で描いてから動くのを防ぐ)
   let goalsLoaded = false;
-  let restGoals = {}; // 休養日だけ違う項目
-  let weekModes = {}; // { 日付: "training" | "rest" }(表示中の週)
-  // その日の目標(トレ日/休養日で変わる)。目標が届くまでは 0(目標なし扱い)
-  const goalOf = (date, nutrient, modes) =>
-    goalsLoaded ? goalsForMode(goals, restGoals, modes[date] || "training")[nutrient] ?? 0 : 0;
+  // 各日の目標。目標が届くまでは 0(目標なし扱い)
+  const goalOf = (nutrient) => (goalsLoaded ? goals[nutrient] ?? 0 : 0);
   let loaded = false;
   let failed = false;
   let alive = true;
@@ -161,13 +152,13 @@ export function renderHistory(root, { query }) {
     return Array.from({ length: 7 }, (_, i) => {
       const date = shiftDate(start, i);
       const dayMeals = meals.filter((m) => m.date === date);
-      return { date, isToday: date === today, rest: weekModes[date] === "rest", count: dayMeals.length, total: sumNutrients(dayMeals) };
+      return { date, isToday: date === today, count: dayMeals.length, total: sumNutrients(dayMeals) };
     });
   }
 
   function draw() {
     const def = defs.find((d) => d.key === key);
-    const days = dayData().map((d) => ({ ...d, value: d.total[key] || 0, goal: goalOf(d.date, key, weekModes) }));
+    const days = dayData().map((d) => ({ ...d, value: d.total[key] || 0, goal: goalOf(key) }));
     const logged = days.filter((d) => d.count > 0);
     const avg = logged.length ? logged.reduce((s, d) => s + d.value, 0) / logged.length : 0;
     const hasGoal = days.some((d) => d.goal > 0);
@@ -196,7 +187,7 @@ export function renderHistory(root, { query }) {
         el("div", {}, el("span", { class: "k" }, "目標に対する平均"), el("strong", {}, loaded && avgGoal > 0 && logged.length ? `${Math.round((avg / avgGoal) * 100)}%` : "—"))),
       chart(def, days),
       // 色だけに頼らず、超過は文字でも示す(超過表示があるのは、たんぱく質以外で目標がある場合)
-      hasGoal && !atLeast ? el("p", { class: "hint chart-note" }, "▲ と斜線の棒は目標を超えた日です(休はその日が休養日で、目標線が変わります)") : null,
+      hasGoal && !atLeast ? el("p", { class: "hint chart-note" }, "▲ と斜線の棒は目標を超えた日です") : null,
       !loaded && !failed ? el("p", { class: "empty" }, "読み込み中…") : null,
       loaded && !logged.length ? el("p", { class: "empty" }, "この週の記録はありません") : null,
     ].filter(Boolean)); // replaceChildren は null を文字列「null」として表示してしまうため除く
@@ -222,9 +213,7 @@ export function renderHistory(root, { query }) {
   let calMeals = [];
   let calLoaded = false;
   let calFailed = false;
-  let calModes = {};
   let calUnwatch = null;
-  let calModesUnwatch = null;
   const calBox = el("section", { class: "card" });
 
   function drawCal() {
@@ -237,7 +226,7 @@ export function renderHistory(root, { query }) {
       const date = `${calMonth}-${String(d).padStart(2, "0")}`;
       const dayMeals = calMeals.filter((x) => x.date === date);
       const protein = sumNutrients(dayMeals).protein || 0;
-      const goal = goalOf(date, "protein", calModes);
+      const goal = goalOf("protein");
       const hit = calLoaded && !calFailed && goal > 0 && dayMeals.length > 0 && protein >= goal;
       const logged = !calFailed && dayMeals.length > 0;
       const cls = `cal-day${hit ? " hit" : logged ? " logged" : ""}${date === today ? " today" : ""}`;
@@ -270,11 +259,7 @@ export function renderHistory(root, { query }) {
     calLoaded = false;
     calFailed = false;
     if (calUnwatch) calUnwatch();
-    if (calModesUnwatch) calModesUnwatch();
-    calModes = {};
     const [y, m] = ym.split("-").map(Number);
-    // 休養日の判定(その日の目標が変わる)のため、同じ月のモードも読む
-    calModesUnwatch = watchDaysRange(`${ym}-01`, dateStr(new Date(y, m, 0)), (modes) => { if (alive) { calModes = modes; drawCal(); } }, () => {});
     calUnwatch = watchMealsRange(`${ym}-01`, dateStr(new Date(y, m, 0)),
       (data) => { if (!alive) return; calMeals = data; calLoaded = true; calFailed = false; drawCal(); },
       () => { if (alive) { calLoaded = true; calFailed = true; drawCal(); } });
@@ -349,15 +334,13 @@ export function renderHistory(root, { query }) {
       draw();
     });
 
-  // 取得できなかったときは初期値の目標で表示する(休養日の上書きが読めなければ、トレ日と同じ)
-  Promise.all([getGoals(DEFAULT_GOALS).then((g) => { goals = g; }, () => {}), getGoalsRest().then((r) => { restGoals = r; }, () => {})])
+  // 取得できなかったときは初期値の目標で表示する
+  getGoals(DEFAULT_GOALS)
+    .then((g) => { goals = g; }, () => {})
     .then(() => { if (alive) { goalsLoaded = true; draw(); drawCal(); } });
 
-  const unwatchWeekDays = watchDaysRange(start, end, (modes) => { if (alive) { weekModes = modes; draw(); } }, () => {});
-
   return () => {
-    alive = false; unwatch(); unwatchWeekDays(); unwatchWeight();
+    alive = false; unwatch(); unwatchWeight();
     if (calUnwatch) calUnwatch();
-    if (calModesUnwatch) calModesUnwatch();
   };
 }

@@ -1,7 +1,6 @@
 // 今日の画面: 日付移動、目標に対する達成バー、朝/昼/夜/間食ごとの記録一覧
 import { el, toast, writeFailed } from "../ui.js";
-import { watchMeals, getGoals, deleteMeal, restoreMeal, getMealsOn, updateMeal, getGoalsRest, watchDay, setDayMode, watchWeight, saveWeight, deleteWeight } from "../db.js";
-import { DAY_MODES, goalsForMode } from "../goals-mode.js";
+import { watchMeals, getGoals, deleteMeal, restoreMeal, getMealsOn, updateMeal, watchWeight, saveWeight, deleteWeight } from "../db.js";
 import { loadFoods, findFood, unitsFor, displayName } from "../foods.js";
 import { ensureUserData } from "../food-picker.js";
 import { swipeToDelete } from "../swipe.js";
@@ -110,12 +109,7 @@ export function renderToday(root, { query }) {
   const path = (d) => `#/today?date=${d}`;
 
   let meals = [];
-  // 目標値。トレ日の目標(baseGoals)と、休養日だけ違う項目(restGoals)から、その日のモードに合わせて goals を決める
-  let baseGoals = { ...DEFAULT_GOALS };
-  let restGoals = {};
-  let dayMode = "training";
   let goals = { ...DEFAULT_GOALS };
-  const applyGoals = () => { goals = goalsForMode(baseGoals, restGoals, dayMode); };
   let loaded = false;
   let alive = true;
   const defs = shownNutrients();
@@ -148,41 +142,17 @@ export function renderToday(root, { query }) {
     summary.replaceChildren(
       // キーボード・読み上げ用の切り替えボタン(カードのタップと同じ動作。クリックはカードに伝わる)
       el("div", { class: "mode-row", onclick: (e) => e.stopPropagation() }, // 余白のタップで、カード全体の切替が働かないように
-        // その日がトレ日か休養日か。目標値(kcal・PFCなど)がモードで変わる
-        el("div", { class: "mode-seg", role: "group", "aria-label": "この日の種類" },
-          DAY_MODES.map(({ key, label }) => {
-            const b = el("button", { type: "button", class: `mode-btn${dayMode === key ? " on" : ""}`, "data-day": key, "aria-pressed": String(dayMode === key) }, label);
-            b.addEventListener("click", (e) => { e.stopPropagation(); chooseDayMode(key); });
-            return b;
-          })),
         el("div", { class: "mode-seg", role: "group", "aria-label": "表示の切り替え(カードをタップしても切り替わります)" },
           [["intake", "摂取量"], ["remain", "残り量"]].map(([key, label]) => {
             const b = el("button", { type: "button", class: `mode-btn${summaryMode === key ? " on" : ""}`, "data-mode": key, "aria-pressed": String(summaryMode === key) }, label);
             b.addEventListener("click", (e) => { e.stopPropagation(); setMode(key, true); }); // カード全体の切替と二重にならないように
             return b;
           }))),
-      // 休養日の目標がまだ違う値になっていないときは、切り替えても数字が変わらない理由を伝える
-      dayMode === "rest"
-        ? el("p", { class: "mode-note" },
-          Object.keys(restGoals).length
-            ? "休養日の目標で表示中"
-            : "休養日の目標は未設定です(トレ日と同じ値)。", Object.keys(restGoals).length ? null : el("a", { href: "#/goals" }, " 目標値で設定"))
-        : null,
       bar(protein, total.protein || 0, goals.protein, { big: true, mode: summaryMode }),
       el("div", { class: "bars" },
         defs.filter((d) => d.key !== "protein").map((d) => bar(d, total[d.key] || 0, goals[d.key] ?? 0, { mode: summaryMode }))),
     );
     refreshSuggest();
-  }
-
-  // トレ日/休養日の切り替え。すぐ画面に反映し、保存は裏で行う(失敗したら通知)
-  function chooseDayMode(mode) {
-    if (mode === dayMode) return;
-    dayMode = mode;
-    applyGoals();
-    drawSummary();
-    summary.querySelector(`[data-day="${mode}"]`)?.focus();
-    setDayMode(date, mode).catch(writeFailed("この日の種類"));
   }
 
   // 体重(1日1件)。入力中の値を、他の更新で上書きしない
@@ -529,25 +499,12 @@ export function renderToday(root, { query }) {
     .then((data) => { if (alive) { prevMeals = data; drawList(); } })
     .catch(() => {}); // 取得できなければコピーのボタンを出さないだけ
 
-  // トレ日の目標 → 休養日の上書き の順に読む(読めなければ、トレ日と同じ値で表示)
-  Promise.all([getGoals(DEFAULT_GOALS).catch(() => null), getGoalsRest().catch(() => ({}))])
-    .then(([g, r]) => {
-      if (!alive) return;
-      if (g) baseGoals = g;
-      restGoals = r;
-      applyGoals();
-      goalsReady = true;
-      drawSummary();
-    });
+  getGoals(DEFAULT_GOALS)
+    .then((g) => { if (alive) { goals = g; goalsReady = true; drawSummary(); } })
+    .catch(() => { goalsReady = true; }); // 取得できなければ初期値のまま表示
 
-  // この日のモードと体重。変更はすぐ反映される
-  const unwatchDay = watchDay(date, (mode) => {
-    if (!alive || mode === dayMode) return; // 自分の切り替えの反映(同じ値)では描き直さない。描き直すとフォーカスが外れる
-    dayMode = mode;
-    applyGoals();
-    drawSummary();
-  }, () => {});
+  // 体重。変更はすぐ反映される
   const unwatchWeight = watchWeight(date, (kg) => { if (alive) { savedWeight = kg; drawWeight(); } }, () => {});
 
-  return () => { alive = false; unwatch(); unwatchDay(); unwatchWeight(); };
+  return () => { alive = false; unwatch(); unwatchWeight(); };
 }

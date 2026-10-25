@@ -17,12 +17,10 @@ export const COLLECTIONS = [
   // optional: 後から追加した項目。古いバックアップにはないので、ファイルに無ければ「含まれない」として触らない
   { key: "displayNames", label: "表示名", optional: true },
   { key: "weights", label: "体重", optional: true },
-  { key: "days", label: "トレ日/休養日", optional: true },
 ];
 export const SINGLES = [
   { key: "goals", label: "目標値" },
   { key: "profile", label: "身体情報" },
-  { key: "goalsRest", label: "休養日の目標", optional: true },
 ];
 
 // ---- Timestamp の変換 ----
@@ -102,13 +100,6 @@ const VALIDATORS = {
     if (!keysOk(d, ["date", "kg", "updatedAt"], ["date", "kg"])) return "項目が不足しているか、余分な項目があります";
     if (d.date !== id || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return "日付が正しくありません";
     if (!num(d.kg, 20, 400)) return "体重が正しくありません";
-    if (!optTs(d, "updatedAt")) return "日時が正しくありません";
-    return "";
-  },
-  days(d, id) {
-    if (!keysOk(d, ["date", "mode", "updatedAt"], ["date", "mode"])) return "項目が不足しているか、余分な項目があります";
-    if (d.date !== id || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return "日付が正しくありません";
-    if (!["training", "rest"].includes(d.mode)) return "モードが正しくありません";
     if (!optTs(d, "updatedAt")) return "日時が正しくありません";
     return "";
   },
@@ -194,7 +185,7 @@ export function parseBackup(text) {
     if (!(key in b.data)) return { error: `${label}がファイルにありません。` };
     const d = b.data[key];
     if (d !== null && !isObj(d)) return { error: `${label}の形式が正しくありません。` };
-    const problem = d ? (VALIDATORS[key] || VALIDATORS.goals)(d) : ""; // 休養日の目標は目標値と同じ形式
+    const problem = d ? VALIDATORS[key](d) : "";
     if (problem) return { error: `${label}: ${problem}。` };
     singles[key] = d;
   }

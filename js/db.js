@@ -178,40 +178,7 @@ export async function writeAllData(ops, onProgress) {
   }
 }
 
-// ---- 休養日の目標 / 日ごとのモード / 体重 ----
-// 休養日の目標: settings/goalsRest = トレ日と違う項目だけ。未設定なら {}。
-export async function getGoalsRest() {
-  const snap = await fs.getDoc(fs.doc(col("settings"), "goalsRest"));
-  const saved = snap.exists() ? snap.data() : {};
-  const out = {};
-  for (const [k, v] of Object.entries(saved)) if (Number.isFinite(v) && v > 0) out[k] = v;
-  return out;
-}
-
-export function saveGoalsRest(overrides) {
-  // merge しない: 保存した項目だけが上書きになる(トレ日と同じに戻した項目は消える)
-  return fs.setDoc(fs.doc(col("settings"), "goalsRest"), { ...overrides, updatedAt: fs.serverTimestamp() });
-}
-
-export async function deleteGoalsRest() {
-  return fs.deleteDoc(fs.doc(col("settings"), "goalsRest"));
-}
-
-// 日ごとのモード: days/{日付} = { date, mode }。ない日は「トレ日」。
-export function watchDay(date, onData, onError) {
-  return fs.onSnapshot(fs.doc(col("days"), date), (snap) => onData(snap.exists() ? snap.data().mode : "training"), onError);
-}
-
-export function watchDaysRange(start, end, onData, onError) {
-  const q = fs.query(col("days"), fs.where("date", ">=", start), fs.where("date", "<=", end));
-  return fs.onSnapshot(q, (snap) => onData(Object.fromEntries(snap.docs.map((d) => [d.id, d.data().mode]))), onError);
-}
-
-// 呼び出し側は await せず、エラーだけ catch すること
-export function setDayMode(date, mode) {
-  return fs.setDoc(fs.doc(col("days"), date), { date, mode, updatedAt: fs.serverTimestamp() });
-}
-
+// ---- 体重 ----
 // 体重: weights/{日付} = { date, kg }。1日1件。
 export function watchWeight(date, onData, onError) {
   return fs.onSnapshot(fs.doc(col("weights"), date), (snap) => onData(snap.exists() ? snap.data().kg : null), onError);
