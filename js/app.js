@@ -17,11 +17,11 @@ import { setUserData } from "./foods.js";
 
 const $ = (id) => document.getElementById(id);
 
-registerRoute("today", { tab: "today", render: renderToday });
-registerRoute("add", { tab: "today", render: renderAdd });
-registerRoute("recipes", { tab: "recipes", render: renderRecipes });
+registerRoute("today", { tab: "today", followsToday: true, render: renderToday });
+registerRoute("add", { tab: "today", followsToday: true, render: renderAdd });
+registerRoute("recipes", { tab: "recipes", followsToday: true, render: renderRecipes });
 registerRoute("recipe", { tab: "recipes", render: renderRecipeEdit });
-registerRoute("history", { tab: "history", render: renderHistory });
+registerRoute("history", { tab: "history", followsToday: true, render: renderHistory });
 registerRoute("settings", { tab: "settings", render: renderSettings });
 registerRoute("foodmaster", { tab: "settings", render: renderFoodMaster });
 registerRoute("foodedit", { tab: "settings", render: renderFoodEdit });

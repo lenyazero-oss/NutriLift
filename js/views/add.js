@@ -3,6 +3,7 @@ import { el, toast, writeFailed } from "../ui.js";
 import { loadFoods, searchFoods, unitsFor } from "../foods.js";
 import { ensureUserData } from "../food-picker.js";
 import { addMeal, deleteMeal } from "../db.js";
+import { setRefreshBlocker } from "../router.js";
 import { shownNutrients, scale, formatValue } from "../nutrients.js";
 import { SLOTS, dateStr, isValidDate, guessSlot } from "../util.js";
 
@@ -10,6 +11,8 @@ export function renderAdd(root, { query }) {
   let date = isValidDate(query.date) ? query.date : dateStr();
   let slot = SLOTS.some((s) => s.key === query.slot) ? query.slot : guessSlot();
   let selected = null;
+  // 日付をまたいでも、食材を選んだり検索語を入力している間は画面を描き直さない
+  setRefreshBlocker(() => selected !== null || search.value.trim() !== "");
 
   const back = el("a", { class: "back", href: `#/today?date=${date}` }, "← 今日の画面へ");
   const dateInput = el("input", { type: "date", value: date, "aria-label": "日付" });

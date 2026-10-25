@@ -1,4 +1,7 @@
-// ハッシュルーティング。routes: { name: { render(container, params), tab? } }
+// ハッシュルーティング。routes: { name: { render(container, params), tab?, followsToday? } }
+// followsToday: 「今日」を初期値に使う画面。日付をまたいだら描画し直す。
+import { dateStr } from "./util.js";
+
 const routes = {};
 let container = null;
 let tabbar = null;
@@ -11,6 +14,27 @@ export function initRouter(viewEl, tabbarEl) {
   container = viewEl;
   tabbar = tabbarEl;
   window.addEventListener("hashchange", onHashChange);
+  // ホーム画面のアプリは開いたままになりやすいので、復帰時と1分ごとに日付の変化を確認する
+  document.addEventListener("visibilitychange", refreshIfNewDay);
+  setInterval(refreshIfNewDay, 60 * 1000);
+}
+
+// 画面を描画した日。これと今日が違えば、日付に依存する画面の初期値(今日・区分)が古い。
+let renderedDay = "";
+
+function refreshIfNewDay() {
+  const day = dateStr();
+  if (document.hidden || !enabled || restoring || day === renderedDay) return;
+  const { name, query } = parse();
+  // 日付(date)や週の終わり(end)を指定して開いている画面、編集中の画面、入力欄にフォーカスがある間は触らない(次の確認で再試行)
+  const route = Object.hasOwn(routes, name) ? routes[name] : routes.today;
+  if (!route?.followsToday || query.date || query.end || leaveGuard) {
+    if (!leaveGuard) renderedDay = day;
+    return;
+  }
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+  if (refreshBlocker?.()) return; // 食材を選択中など、画面が保持している途中の状態を捨てない
+  render();
 }
 
 export function navigate(path) {
@@ -40,6 +64,12 @@ let cleanup = null;
 let leaveGuard = null;
 export function setLeaveGuard(fn) {
   leaveGuard = fn;
+}
+
+// 日付またぎの再描画を保留したい間、true を返す関数を画面が設定する(離脱確認までは不要な途中状態用)。
+let refreshBlocker = null;
+export function setRefreshBlocker(fn) {
+  refreshBlocker = fn;
 }
 
 // 表示中の画面の履歴番号。各履歴エントリに history.state = { i } として持たせ、
@@ -73,6 +103,7 @@ export function resetView() {
   if (cleanup) cleanup();
   cleanup = null;
   leaveGuard = null;
+  refreshBlocker = null;
   if (container) container.replaceChildren();
 }
 
@@ -89,6 +120,8 @@ export function render() {
     return;
   }
   leaveGuard = null;
+  refreshBlocker = null;
+  renderedDay = dateStr();
   const stamped = history.state?.i;
   shownIdx = typeof stamped === "number" ? stamped : shownIdx + 1;
   if (typeof stamped !== "number") history.replaceState({ i: shownIdx }, "");
