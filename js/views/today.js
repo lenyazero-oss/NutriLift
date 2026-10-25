@@ -1,6 +1,8 @@
 // 今日の画面: 日付移動、目標に対する達成バー、朝/昼/夜/間食ごとの記録一覧
 import { el, toast, writeFailed } from "../ui.js";
-import { watchMeals, getGoals, deleteMeal, restoreMeal } from "../db.js";
+import { watchMeals, getGoals, deleteMeal, restoreMeal, getMealsOn } from "../db.js";
+import { copyMeals, mealsInSlot, mealsToRecipeItems, saveMealsAsSet } from "../copy.js";
+import { navigate } from "../router.js";
 import { currentUid } from "../auth.js";
 import { shownNutrients, DEFAULT_GOALS, sumNutrients, AT_LEAST } from "../nutrients.js";
 import { SLOTS, dateStr, shiftDate, isValidDate } from "../util.js";
@@ -84,6 +86,54 @@ export function renderToday(root, { query }) {
     });
   }
 
+  // 前日(今日を見ているときは「昨日」)の食事。同じ食事区分が空のときにコピーできる。
+  // 日付を引数にした作りなので、コピー元を任意の日付にも広げられる
+  const prevDate = shiftDate(date, -1);
+  const prevLabel = isToday ? "昨日" : "前日";
+  let prevMeals = [];
+
+  function copyFromPrev(slotDef, prevItems, btn) {
+    if (meals.some((m) => m.slot === slotDef.key)) return toast("この食事にはすでに記録があります"); // 別の端末で先に記録された場合
+    btn.disabled = true; // 連打による二重コピーを防ぐ
+    const uid = currentUid();
+    try {
+      const { ids, done } = copyMeals(prevItems, date, slotDef.key);
+      done.catch(writeFailed(`${prevLabel}の${slotDef.label}のコピー`));
+      toast(`${prevLabel}の${slotDef.label}を${ids.length}品コピーしました`, {
+        duration: 6000,
+        action: {
+          label: "元に戻す",
+          onClick: () => {
+            if (uid !== currentUid()) return toast("ユーザーが変わったため元に戻せません", { error: true });
+            Promise.all(ids.map((id) => deleteMeal(id))).catch(() => toast("元に戻せませんでした。", { error: true, duration: 6000 }));
+          },
+        },
+      });
+    } catch {
+      btn.disabled = false;
+      toast("コピーできませんでした。", { error: true });
+    }
+  }
+
+  // 食事に記録した食材を、1人前のレシピ(セット)として保存する。名前は入力してもらう
+  function saveAsSet(slotDef, items) {
+    const input = prompt("セットの名前を入力してください", `${slotDef.label}のセット`);
+    if (input === null) return;
+    const name = input.trim().slice(0, 40);
+    if (!name) return toast("名前を入力してください");
+    try {
+      const r = saveMealsAsSet(name, items);
+      if (!r) return toast("食材から記録した品がないため、セットにできません", { error: true, duration: 5000 });
+      r.done.catch(writeFailed(`セット「${name}」`));
+      toast(`セット「${name}」を保存しました${r.skipped ? `(レシピから記録した${r.skipped}品は含まれません)` : ""}`, {
+        action: { label: "セットを見る", onClick: () => navigate("#/recipes") },
+        duration: 6000,
+      });
+    } catch {
+      toast("保存できませんでした。", { error: true });
+    }
+  }
+
   function mealRow(m) {
     const n = m.nutrients || {};
     return el("li", { class: "meal" },
@@ -106,15 +156,29 @@ export function renderToday(root, { query }) {
         const href = `#/add?date=${date}&slot=${s.key}`;
         // 空の枠は1行にまとめて、1日の全体がスクロールなしで見えるようにする
         if (!items.length) {
+          // 前日の同じ食事があるときだけ、コピーのボタンを下に出す
+          // 今日の記録を読み込む前は出さない(すでに記録のある枠に出て、二重にコピーするのを防ぐ)
+          const prev = loaded ? mealsInSlot(prevMeals, s.key) : [];
+          // 見出しと合計は縦に重ねて、コピーのボタンも同じ1行に収める(コピーがあっても高さが増えない)
           return el("section", { class: "card slot slot-empty" },
-            el("h2", {}, s.label),
-            sum,
+            el("div", { class: "slot-left" }, el("h2", {}, s.label), sum),
+            prev.length
+              ? el("button", {
+                type: "button", class: "btn add-inline copy-inline",
+                "aria-label": `${prevLabel}の${s.label}(${prev.length}品)をコピー`,
+                onclick: (e) => copyFromPrev(s, prev, e.currentTarget),
+              }, "コピー")
+              : null,
             el("a", { class: "btn add-inline", href, "aria-label": `${s.label}に追加` }, "＋ 追加"));
         }
         return el("section", { class: "card slot" },
           el("div", { class: "slot-head" }, el("h2", {}, s.label), sum),
           el("ul", { class: "meals" }, items.map(mealRow)),
-          el("a", { class: "btn add-btn", href }, `＋ ${s.label}に追加`));
+          el("a", { class: "btn add-btn", href }, `＋ ${s.label}に追加`),
+          // 2品以上の食事だけ、セットにできる(1品だけのセットは意味が薄く、カードも煩雑になる)
+          mealsToRecipeItems(items).length >= 2
+            ? el("button", { type: "button", class: "btn btn-link set-link", onclick: () => saveAsSet(s, items) }, "この食事をセットに保存")
+            : null);
       }));
   }
 
@@ -133,6 +197,10 @@ export function renderToday(root, { query }) {
       notice.hidden = false;
     }
   );
+
+  getMealsOn(prevDate)
+    .then((data) => { if (alive) { prevMeals = data; drawList(); } })
+    .catch(() => {}); // 取得できなければコピーのボタンを出さないだけ
 
   getGoals(DEFAULT_GOALS)
     .then((g) => { if (alive) { goals = g; redraw(); } })

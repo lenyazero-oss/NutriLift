@@ -14,6 +14,7 @@ import { renderLogin } from "./views/login.js";
 import { renderAdd } from "./views/add.js";
 import { el, hideToast } from "./ui.js";
 import { invalidateUserData } from "./food-picker.js";
+import { invalidateUsage } from "./usage.js";
 import { setUserData } from "./foods.js";
 
 const $ = (id) => document.getElementById(id);
@@ -41,6 +42,7 @@ let redirectError = "";
 // ユーザーが変わったら、前ユーザーの自作食材・単位のキャッシュを捨てる
 function resetUserCache() {
   invalidateUserData();
+  invalidateUsage(); // 別のユーザーの集計を引き継がない
   setUserData({});
 }
 

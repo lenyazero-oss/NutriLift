@@ -1,6 +1,6 @@
 // 静的ファイルのキャッシュ(オフライン起動用)。更新時は VERSION を上げる。
 // 注意: ファイルを追加したら ASSETS にも追記すること(1つでも404だとインストールが失敗する)。
-const VERSION = "v32";
+const VERSION = "v34";
 const CACHE = `meal-app-${VERSION}`;
 // Firebase SDK(バージョン固定)用。アプリの更新(VERSION)では削除しない。SDKを更新したら名前を変える。
 const SDK_CACHE = "meal-sdk-v1";
@@ -35,6 +35,8 @@ const ASSETS = [
   "./js/db.js",
   "./js/foods.js",
   "./js/nutrients.js",
+  "./js/copy.js",
+  "./js/usage.js",
   "./js/profile.js",
   "./js/util.js",
   // data/*.json は初回アクセス時にキャッシュされる(未生成でもインストールが失敗しないよう除外)

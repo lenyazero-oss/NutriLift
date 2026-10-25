@@ -113,8 +113,9 @@ export function renderRecipes(root) {
   const notice = el("p", { class: "error", role: "alert", hidden: true });
 
   root.append(
-    el("h1", {}, "レシピ"),
-    el("a", { class: "btn btn-big", href: "#/recipe/new" }, "＋ レシピを作る"),
+    el("h1", {}, "レシピ・セット"),
+    el("p", { class: "hint" }, "よく食べる組み合わせを登録すると、1タップで記録できます。今日の画面の「この食事をセットに保存」からも作れます。"),
+    el("a", { class: "btn btn-big", href: "#/recipe/new" }, "＋ レシピ・セットを作る"),
     notice, list);
 
   const unwatch = watchRecipes(

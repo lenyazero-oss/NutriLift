@@ -11,9 +11,11 @@ function col(name) {
 
 // 食事を記録する。IDを先に確定するため、オフライン時もすぐ { id } が得られる。
 // done はサーバー応答まで解決されないので、呼び出し側は await せず、エラーだけ catch すること。
-export function addMeal(meal) {
+// createdAtMs を渡すと、その時刻で記録する(コピーで元の並び順を保つため)。省略時はサーバー時刻。
+export function addMeal(meal, createdAtMs) {
   const ref = fs.doc(col("meals"));
-  const done = fs.setDoc(ref, { ...meal, createdAt: fs.serverTimestamp() });
+  const createdAt = createdAtMs != null ? fs.Timestamp.fromMillis(createdAtMs) : fs.serverTimestamp();
+  const done = fs.setDoc(ref, { ...meal, createdAt });
   return { id: ref.id, done };
 }
 
@@ -44,6 +46,20 @@ export function watchMeals(date, onData, onError) {
       ),
     onError
   );
+}
+
+const withId = (d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) });
+
+// 指定日の食事を1回だけ読む(「昨日からコピー」など。任意の日付に使える)
+export async function getMealsOn(date) {
+  const snap = await fs.getDocs(fs.query(col("meals"), fs.where("date", "==", date)));
+  return snap.docs.map(withId);
+}
+
+// start(含む)以降の食事を1回だけ読む(「最近・よく使う食材」の集計用)。date の範囲条件のみで複合インデックスは不要。
+export async function getMealsSince(start) {
+  const snap = await fs.getDocs(fs.query(col("meals"), fs.where("date", ">=", start)));
+  return snap.docs.map(withId);
 }
 
 // 期間(start〜end、両端を含む)の食事を監視する。date の範囲条件のみなので複合インデックスは不要。
