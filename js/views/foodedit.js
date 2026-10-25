@@ -3,9 +3,9 @@
 //  #/foodedit/custom/<id>    自作食材の編集(名前・栄養素・単位)
 //  #/foodedit/table/<id>     成分表の食材の単位の上書き
 import { el, toast, writeFailed } from "../ui.js";
-import { loadFoods, findFood, unitsFor } from "../foods.js";
+import { loadFoods, findFood, unitsFor, displayName, displayNameOf, cleanName } from "../foods.js";
 import { ensureUserData, invalidateUserData } from "../food-picker.js";
-import { saveCustomFood, deleteCustomFood, saveUnitOverride, deleteUnitOverride } from "../db.js";
+import { saveCustomFood, deleteCustomFood, saveUnitOverride, deleteUnitOverride, saveDisplayName, deleteDisplayName } from "../db.js";
 import { navigate, setLeaveGuard } from "../router.js";
 import { shownNutrients } from "../nutrients.js";
 
@@ -46,6 +46,12 @@ export function renderFoodEdit(root, { args }) {
     const defs = shownNutrients();
 
     const nameInput = el("input", { type: "text", value: food.name || "", maxlength: "40", placeholder: "食材名(例: 自家製プロテインバー)", "aria-label": "食材名" });
+    // 成分表の食材には表示名を付けられる(元の名前は変わらない)。空欄なら整形した名前で表示する
+    const savedDisplay = isCustom ? "" : displayNameOf(food.id);
+    const displayInput = el("input", {
+      type: "text", value: savedDisplay, maxlength: "40",
+      placeholder: isCustom ? "" : cleanName(food.name), "aria-label": "表示名",
+    });
     const nutInputs = defs.map((d) => {
       const input = el("input", {
         type: "number", inputmode: "decimal", min: "0", step: "any",
@@ -128,7 +134,10 @@ export function renderFoodEdit(root, { args }) {
           const name = nameInput.value.trim();
           finish("自作食材を保存しました", saveCustomFood(id, { name, n, units: cleanUnits() }).done, `自作食材「${name}」`);
         } else {
-          finish("単位を保存しました", saveUnitOverride(food.id, cleanUnits()), `「${food.name}」の単位`);
+          // 単位と表示名を一緒に保存する。表示名が空で、すでに設定があれば削除する
+          const nm = displayInput.value.trim();
+          const nameOp = nm ? saveDisplayName(food.id, nm) : savedDisplay ? deleteDisplayName(food.id) : null;
+          finish("保存しました", Promise.all([saveUnitOverride(food.id, cleanUnits()), nameOp].filter(Boolean)), `「${displayName(food)}」の設定`);
         }
       } catch {
         toast("保存できませんでした。", { error: true });
@@ -139,19 +148,23 @@ export function renderFoodEdit(root, { args }) {
     // 未保存の変更があるまま離れようとしたら確認する(戻るリンク・下部タブ・スワイプ戻りのどれでも)。
     // 開いた時点の内容と比べるので、元に戻せば確認は出ない。
     const snapshot = () => JSON.stringify([
-      nameInput.value.trim(), nutInputs.map(({ input }) => input.value.trim()), units.map((u) => [u.name.trim(), u.g]),
+      nameInput.value.trim(), displayInput.value.trim(), nutInputs.map(({ input }) => input.value.trim()), units.map((u) => [u.name.trim(), u.g]),
     ]);
     const initial = snapshot();
     setLeaveGuard(() => leaving || snapshot() === initial || confirm("変更が保存されていません。保存せずに移動しますか?\n(OKを押すと入力した内容は破棄されます)"));
 
-    const children = [back, el("h1", {}, isCustom ? (id ? "自作食材を編集" : "自作食材を作る") : food.name)];
+    const children = [back, el("h1", {}, isCustom ? (id ? "自作食材を編集" : "自作食材を作る") : displayName(food))];
     if (isCustom) {
       children.push(el("section", { class: "card" },
         el("label", { class: "lbl" }, "食材名", nameInput),
         el("h2", {}, "栄養素(100gあたり)"),
         ...nutInputs.map(({ def, input }) => el("label", { class: "lbl" }, `${def.label}(${def.unit})`, input))));
     } else {
-      children.push(el("p", { class: "hint" }, "成分表の食材です。栄養素は変更できません。単位だけ設定できます。"));
+      children.push(
+        el("p", { class: "hint" }, "成分表の食材です。栄養素は変更できません。表示名と単位を設定できます。"),
+        el("section", { class: "card" },
+          el("label", { class: "lbl" }, "表示名", displayInput),
+          el("p", { class: "hint" }, `空欄にすると「${cleanName(food.name)}」と表示します。元の名前: ${food.name}`)));
     }
     children.push(
       el("section", { class: "card" },

@@ -1,5 +1,5 @@
 // バックアップ(書き出し/読み込み)の形式・検証・統合の計画。Firestore には触らない(読み書きは db.js)。
-// ファイル形式: { app:"NutriLift", format:1, exportedAt, data:{ meals:[{id,…}], recipes, customFoods, unitOverrides, goals, profile } }
+// ファイル形式: { app:"NutriLift", format:1, exportedAt, data:{ meals:[{id,…}], recipes, customFoods, unitOverrides, displayNames, goals, profile } }
 // Firestore の Timestamp は { "_ts": ミリ秒 } で表す。
 import { NUTRIENTS } from "./nutrients.js";
 
@@ -14,6 +14,8 @@ export const COLLECTIONS = [
   { key: "recipes", label: "レシピ" },
   { key: "customFoods", label: "自作食材" },
   { key: "unitOverrides", label: "単位の設定" },
+  // optional: 後から追加した項目。古いバックアップにはないので、ファイルに無ければ「含まれない」として触らない
+  { key: "displayNames", label: "表示名", optional: true },
 ];
 export const SINGLES = [
   { key: "goals", label: "目標値" },
@@ -92,6 +94,12 @@ const VALIDATORS = {
     if (!optTs(d, "createdAt") || !optTs(d, "updatedAt")) return "日時が正しくありません";
     return "";
   },
+  displayNames(d) {
+    if (!keysOk(d, ["name", "updatedAt"], ["name"])) return "項目が不足しているか、余分な項目があります";
+    if (!str(d.name, 100)) return "表示名が正しくありません";
+    if (!optTs(d, "updatedAt")) return "日時が正しくありません";
+    return "";
+  },
   unitOverrides(d) {
     if (!keysOk(d, ["units", "updatedAt"], ["units"])) return "項目が不足しているか、余分な項目があります";
     if (!unitList(d.units)) return "単位が正しくありません";
@@ -140,7 +148,8 @@ export function parseBackup(text) {
   // 書き出したファイルには全項目が必ずある。欠けているのは壊れたファイルなので、「上書き」で全削除になる前に止める
   const collections = {};
   let total = 0;
-  for (const { key, label } of COLLECTIONS) {
+  for (const { key, label, optional } of COLLECTIONS) {
+    if (optional && !(key in b.data)) { collections[key] = null; continue; } // 古いバックアップ: この項目は含まれない
     const list = b.data[key];
     if (!Array.isArray(list)) return { error: `${label}がファイルにないか、形式が正しくありません。` };
     total += list.length;
@@ -208,7 +217,10 @@ export function planImport(file, current, mode) {
     summary.push(row);
   };
 
-  for (const { key, label } of COLLECTIONS) compare(label, key, file.collections[key], current.collections[key]);
+  for (const { key, label } of COLLECTIONS) {
+    if (file.collections[key] === null) continue; // ファイルに含まれない項目は、統合でも上書きでも触らない
+    compare(label, key, file.collections[key], current.collections[key]);
+  }
   for (const { key, label } of SINGLES) {
     const f = file.singles[key];
     const c = current.singles[key];

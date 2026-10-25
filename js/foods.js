@@ -35,15 +35,48 @@ export async function loadFoods() {
   foods = data.foods.map((f) => ({ ...f, norm: normalize(f.name), fold: fold(f.name), source: "table" }));
   defaultRules = units?.rules || [];
   loaded = true;
+  applyCustomFoods(); // 先にユーザーデータが届いていた場合も、自作食材を失わない
 }
 
-// 自作食材・単位の上書きを反映(Firestoreから取得したもの)
-export function setUserData({ customFoods = [], unitOverrides = {} }) {
+// 自作食材・単位の上書き・表示名を反映(Firestoreから取得したもの)
+let customList = [];
+let displayNames = {}; // { 食材ID: 表示名 }(成分表の食材だけ)
+function applyCustomFoods() {
   foods = foods.filter((f) => f.source !== "custom");
-  customFoods.forEach((c) =>
+  customList.forEach((c) =>
     foods.push({ id: c.id, name: c.name, norm: normalize(c.name), fold: fold(c.name), n: c.n || {}, units: c.units || [], source: "custom" })
   );
+}
+export function setUserData({ customFoods = [], unitOverrides = {}, names = {} }) {
+  customList = customFoods;
+  applyCustomFoods();
   overrides = unitOverrides;
+  displayNames = names;
+}
+
+// 成分表の名前の「<鳥肉類>」のような分類と、先頭の「(かんきつ類)」を除いた名前。
+// 例: 「<鳥肉類> にわとり [若どり・主品目] もも 皮なし 生」→「にわとり [若どり・主品目] もも 皮なし 生」
+export function cleanName(name) {
+  const cleaned = String(name)
+    .replace(/[<＜][^>＞]*[>＞]/g, "")
+    .replace(/^\s*[(（][^)）]*[)）]/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || String(name); // 全部消えてしまう名前は元のまま
+}
+
+// 画面に出す名前。ユーザーが設定した表示名 > 整形した名前(元の名前は保存データに残る)。
+// x は { name, source, id } か、食事・レシピの { name, source, foodId }
+export function displayName(x) {
+  const id = x.source === "table" ? x.foodId ?? x.id : null;
+  if (id != null && displayNames[id]) return displayNames[id];
+  // 自作食材・レシピは名前を自分で付けているので、そのまま出す
+  return x.source === "table" ? cleanName(x.name) : x.name;
+}
+
+// 表示名が設定されているか(食材編集画面の入力欄の初期値用)
+export function displayNameOf(foodId) {
+  return displayNames[foodId] || "";
 }
 
 export function findFood(id, source) {
@@ -129,7 +162,12 @@ export function searchFoods(query, limit = 50) {
   const run = (field, convert) => {
     const parts = rawParts.map((alts) => alts.map(convert).filter(Boolean)).filter((alts) => alts.length);
     if (!parts.length) return [];
-    const hits = foods.filter((f) => parts.every((alts) => alts.some((a) => f[field].includes(a))));
+    // 表示名を設定した食材は、表示名でも見つかるようにする(元の名前でも見つかる)
+    const hay = (f) => {
+      const dn = f.source === "table" ? displayNames[f.id] : null;
+      return dn ? `${f[field]} ${convert(normalize(dn))}` : f[field];
+    };
+    const hits = foods.filter((f) => { const h = hay(f); return parts.every((alts) => alts.some((a) => h.includes(a))); });
     // 先頭一致・自作食材・名前の短いものを優先
     const score = (f) =>
       (parts[0].some((a) => f[field].startsWith(a)) ? 0 : 100) + (f.source === "custom" ? -50 : 0) + f[field].length;

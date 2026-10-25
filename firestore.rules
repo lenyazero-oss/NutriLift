@@ -60,6 +60,14 @@ service cloud.firestore {
         && d.get('updatedAt', request.time) is timestamp;
     }
 
+    // 成分表の食材の表示名: { name }(元の名前は変えない)
+    function validDisplayName(d) {
+      return d.keys().hasOnly(['name', 'updatedAt'])
+        && d.keys().hasAll(['name'])
+        && str(d.name, 100)
+        && d.get('updatedAt', request.time) is timestamp;
+    }
+
     // 成分表の食材の単位の上書き: { units:[{name,g}] }
     function validUnitOverride(d) {
       return d.keys().hasOnly(['units', 'updatedAt'])
@@ -100,6 +108,10 @@ service cloud.firestore {
       match /customFoods/{id} {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validCustomFood(request.resource.data);
+      }
+      match /displayNames/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validDisplayName(request.resource.data);
       }
       match /unitOverrides/{id} {
         allow read, delete: if isOwner(uid);

@@ -1,10 +1,13 @@
 // 今日の画面: 日付移動、目標に対する達成バー、朝/昼/夜/間食ごとの記録一覧
 import { el, toast, writeFailed } from "../ui.js";
-import { watchMeals, getGoals, deleteMeal, restoreMeal, getMealsOn } from "../db.js";
+import { watchMeals, getGoals, deleteMeal, restoreMeal, getMealsOn, updateMeal } from "../db.js";
+import { loadFoods, findFood, unitsFor, displayName } from "../foods.js";
+import { ensureUserData } from "../food-picker.js";
+import { swipeToDelete } from "../swipe.js";
 import { copyMeals, mealsInSlot, mealsToRecipeItems, saveMealsAsSet } from "../copy.js";
 import { navigate } from "../router.js";
 import { currentUid } from "../auth.js";
-import { shownNutrients, DEFAULT_GOALS, sumNutrients, AT_LEAST } from "../nutrients.js";
+import { shownNutrients, DEFAULT_GOALS, sumNutrients, AT_LEAST, scale, formatValue } from "../nutrients.js";
 import { SLOTS, dateStr, shiftDate, isValidDate } from "../util.js";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -16,26 +19,42 @@ function dateLabel(str) {
 }
 
 // 達成バー。値が目標を超えた場合、「目標以上」が達成の栄養素(たんぱく質・食物繊維)以外は「超過」色にする
-function bar(def, value, goal, { big = false } = {}) {
+// mode: "intake"(摂取量 / 目標) か "remain"(残り量)。棒は常に摂取量の割合を示す。
+function bar(def, value, goal, { big = false, mode = "intake" } = {}) {
   const ratio = goal > 0 ? value / goal : 0;
   const atLeast = AT_LEAST.has(def.key);
   const over = ratio > 1 && !atLeast;
   const reached = atLeast && goal > 0 && ratio >= 1; // 「以上」型は届いたら達成を文字でも示す
+  const fmt = (v) => `${v.toFixed(def.decimals)}${def.unit}`;
   const fill = el("div", { class: `fill${over ? " over" : ""}`, style: `width:${Math.min(ratio, 1) * 100}%` });
   const track = el("div", {
     class: "track", role: "progressbar", "aria-label": def.label,
     "aria-valuemin": "0", "aria-valuemax": String(goal), "aria-valuenow": String(Math.round(value)),
     ...(reached ? { "aria-valuetext": "目標達成" } : {}),
   }, fill);
-  const nums = `${value.toFixed(def.decimals)} / ${goal}${def.unit}`;
-  if (!big) {
-    // 色だけに頼らず、超過は文字でも示す
-    return el("div", { class: "bar" },
-      el("div", { class: "bar-head" }, el("span", {}, def.label), el("span", { class: "bar-num" }, nums)), track,
-      over ? el("div", { class: "over-text" }, `+${(value - goal).toFixed(def.decimals)}${def.unit} 超過`) : null,
-      reached ? el("div", { class: "reached-text" }, "✓ 目標達成") : null);
-  }
   const remain = goal - value;
+  if (!big) {
+    // 残り量表示: 「以上」型は あと◯ / 達成、「以内」型は 残り◯ / 超過。色だけに頼らず文字でも示す
+    const remainText = atLeast
+      ? (remain > 0 ? `あと ${fmt(remain)}` : "✓ 達成")
+      : (remain >= 0 ? `残り ${fmt(remain)}` : `+${fmt(-remain)} 超過`);
+    const nums = mode === "remain" ? (goal > 0 ? remainText : "—") : `${value.toFixed(def.decimals)} / ${goal}${def.unit}`;
+    return el("div", { class: "bar" },
+      el("div", { class: "bar-head" }, el("span", {}, def.label),
+        el("span", { class: `bar-num${mode === "remain" && (over || (reached && atLeast)) ? (over ? " over-text" : " reached-text") : ""}` }, nums)),
+      track,
+      mode === "intake" && over ? el("div", { class: "over-text" }, `+${fmt(value - goal)} 超過`) : null,
+      mode === "intake" && reached ? el("div", { class: "reached-text" }, "✓ 目標達成") : null);
+  }
+  if (mode === "remain") {
+    return el("div", { class: "bar bar-big" },
+      el("div", { class: "bar-head" }, el("span", { class: "bar-title" }, def.label)),
+      remain > 0
+        ? el("div", { class: "big-num" }, "あと ", el("strong", {}, remain.toFixed(def.decimals)), def.unit)
+        : el("div", { class: "big-num" }, el("strong", { class: "reached-text-big" }, "✓ 達成")),
+      track,
+      el("div", { class: "bar-sub" }, remain > 0 ? `目標 ${goal}${def.unit}` : `${fmt(value)} / 目標 ${goal}${def.unit}`));
+  }
   return el("div", { class: "bar bar-big" },
     el("div", { class: "bar-head" }, el("span", { class: "bar-title" }, def.label)),
     el("div", { class: "big-num" }, el("strong", {}, value.toFixed(def.decimals)), ` / ${goal}${def.unit}`),
@@ -65,20 +84,40 @@ export function renderToday(root, { query }) {
   const toTodayLink = isToday ? null
     : el("a", { class: "btn btn-link center", href: "#/today" }, "今日に戻る");
 
+  // 摂取量 / 残り量の表示。カードのどこをタップしても切り替わり、選択は端末に覚えておく
+  let summaryMode = "intake";
+  try { if (localStorage.getItem("summaryMode") === "remain") summaryMode = "remain"; } catch { /* 保存できない環境では毎回「摂取量」 */ }
+  function setMode(mode, refocus = false) {
+    summaryMode = mode;
+    try { localStorage.setItem("summaryMode", summaryMode); } catch { /* 保存できなくても切り替えは有効 */ }
+    drawSummary();
+    if (refocus) summary.querySelector(`[data-mode="${mode}"]`)?.focus(); // 描き直してもフォーカス位置を保つ
+  }
+  summary.addEventListener("click", () => setMode(summaryMode === "remain" ? "intake" : "remain"));
+
   function drawSummary() {
     const total = sumNutrients(meals);
     const protein = defs.find((d) => d.key === "protein");
     summary.replaceChildren(
-      bar(protein, total.protein || 0, goals.protein, { big: true }),
+      // キーボード・読み上げ用の切り替えボタン(カードのタップと同じ動作。クリックはカードに伝わる)
+      el("div", { class: "mode-seg", role: "group", "aria-label": "表示の切り替え(カードをタップしても切り替わります)" },
+        [["intake", "摂取量"], ["remain", "残り量"]].map(([key, label]) => {
+          const b = el("button", { type: "button", class: `mode-btn${summaryMode === key ? " on" : ""}`, "data-mode": key, "aria-pressed": String(summaryMode === key) }, label);
+          b.addEventListener("click", (e) => { e.stopPropagation(); setMode(key, true); }); // カード全体の切替と二重にならないように
+          return b;
+        })),
+      bar(protein, total.protein || 0, goals.protein, { big: true, mode: summaryMode }),
       el("div", { class: "bars" },
-        defs.filter((d) => d.key !== "protein").map((d) => bar(d, total[d.key] || 0, goals[d.key] ?? 0))));
+        defs.filter((d) => d.key !== "protein").map((d) => bar(d, total[d.key] || 0, goals[d.key] ?? 0, { mode: summaryMode }))));
   }
 
   function removeMeal(m) {
     const { id } = m;
+    if (editingId === id) { editingId = null; editPanel = null; } // 「元に戻す」で復活した行が編集モードで開かないように
     const uid = currentUid(); // 取り消し時に同じユーザーか確認するため
-    deleteMeal(id).catch(writeFailed(`${m.name} の記録`, "削除"));
-    toast(`${m.name} を削除しました`, {
+    deleteMeal(id).catch(writeFailed(`${displayName(m)} の記録`, "削除"));
+    toast(`${displayName(m)} を削除しました`, {
+      duration: 6000,
       action: {
         label: "元に戻す",
         onClick: () => restoreMeal(m, uid).catch(() => toast("元に戻せませんでした。", { error: true, duration: 6000 })),
@@ -134,14 +173,144 @@ export function renderToday(root, { query }) {
     }
   }
 
+  // 数量の表記。グラム以外の単位(個・本・人前など)には、グラム換算を併記する(例: 1本(約100g))
+  function qtyLabel(m) {
+    const q = m.qtyText || `${m.grams}g`;
+    return /^[\d.]+\s*g$/.test(q) ? q : `${q}(約${Math.round(m.grams * 10) / 10}g)`;
+  }
+
+  // 行をタップすると、その場で量を変更できる。開いている行の ID は、記録の更新で描き直されても覚えておく
+  let editingId = null;
+  // 操作のヒントは、最初の数回だけ出す(慣れたら邪魔になるため)
+  let showHint = true;
+  try {
+    const count = Number(localStorage.getItem("swipeHintCount") || 0);
+    showHint = count < 5;
+    localStorage.setItem("swipeHintCount", String(count + 1));
+  } catch { /* 保存できない環境では毎回出す */ }
+  let editPanel = null; // { id, node }: 描き直しでも入力中のフォームを失わないよう、作ったフォームを使い回す
+
+  // 量の変更フォーム。食材なら グラム/単位×数量、レシピなら人前数。栄養素は食材の100gあたりから計算し直す
+  async function buildEditor(m, panel) {
+    panel.replaceChildren(el("p", { class: "hint" }, "読み込み中…"));
+    const isRecipe = m.source === "recipe";
+    let food = null;
+    let units = [];
+    if (!isRecipe && m.foodId) {
+      try { await loadFoods(); await ensureUserData(); } catch { /* 読み込めなくても、グラムでの変更はできる */ }
+      food = findFood(m.foodId, m.source);
+      units = food ? unitsFor(food) : [];
+    }
+    if (!alive || editingId !== m.id) return;
+
+    // 栄養素は記録時点のスナップショットを量の比で増減する(あとで食材マスタを編集していても、過去の記録の前提は変えない)。
+    // 記録が0gなど比にできないときだけ、食材の100gあたりの値を使う
+    const snapshot = Object.entries(m.nutrients || {}).filter(([, v]) => Number.isFinite(v));
+    const portions0 = isRecipe ? parseFloat((m.qtyText || "").match(/^([\d.]+)人前$/)?.[1]) : NaN;
+    const byPortions = isRecipe && portions0 > 0;
+
+    // いまの量を初期値にする: 「150g」→ グラム、「2個」→ その単位、「1.5人前」→ 人前
+    let unitIndex = "g";
+    let qtyValue = String(Math.round(m.grams * 10) / 10);
+    if (byPortions) qtyValue = String(portions0);
+    else {
+      const match = (m.qtyText || "").match(/^([\d.]+)\s*(.+)$/);
+      const idx = match ? units.findIndex((u) => u.name === match[2]) : -1;
+      if (match && match[2] !== "g" && idx >= 0) { unitIndex = String(idx); qtyValue = match[1]; }
+      else if (match && match[2] === "g") qtyValue = match[1];
+    }
+
+    const qty = el("input", { type: "number", inputmode: "decimal", min: "0", step: "any", value: qtyValue, "aria-label": byPortions ? "人前" : "量" });
+    qty.addEventListener("focus", () => {
+      qty.select();
+      setTimeout(() => panel.scrollIntoView({ block: "center", behavior: "smooth" }), 300); // キーボードに保存ボタンが隠れないように
+    });
+    qty.setAttribute("enterkeyhint", "done");
+    qty.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); saveBtn.click(); } });
+    const unitSel = byPortions ? null : el("select", { "aria-label": "単位" },
+      el("option", { value: "g" }, "グラム (g)"),
+      units.map((u, i) => el("option", { value: String(i) }, `${u.name} (${u.g}g)`)));
+    if (unitSel) unitSel.value = unitIndex;
+    const preview = el("div", { class: "preview", "aria-live": "polite" });
+    const saveBtn = el("button", { type: "button", class: "btn btn-primary" }, "量を変更する");
+
+    // 入力から、新しい グラム・表記・栄養素 を計算する(不正なら null)
+    const compute = () => {
+      const q = parseFloat(qty.value);
+      if (!(q > 0)) return null;
+      if (byPortions) {
+        const ratio = q / portions0;
+        return {
+          grams: Math.round(m.grams * ratio * 10) / 10, qtyText: `${q}人前`,
+          nutrients: Object.fromEntries(Object.entries(m.nutrients || {}).filter(([, v]) => Number.isFinite(v)).map(([k, v]) => [k, Math.round(v * ratio * 100) / 100])),
+        };
+      }
+      const unit = unitSel.value === "g" ? null : units[Number(unitSel.value)];
+      const g = Math.round((unit ? q * unit.g : q) * 10) / 10;
+      if (!(g > 0) || g > 100000) return null;
+      let nutrients;
+      if (m.grams > 0 && snapshot.length) {
+        const ratio = g / m.grams;
+        nutrients = Object.fromEntries(snapshot.map(([k, v]) => [k, Math.round(v * ratio * 100) / 100]));
+      } else if (food?.n) nutrients = scale(food.n, g);
+      else return null;
+      return { grams: g, qtyText: unit ? `${q}${unit.name}` : `${q}g`, nutrients };
+    };
+    const update = () => {
+      const r = compute();
+      saveBtn.disabled = !r;
+      preview.replaceChildren(el("div", { class: "preview-g" }, r ? qtyLabel(r) : "量を入力してください"),
+        ...(r ? [el("div", { class: "preview-n" }, shownNutrients().map((d) => el("span", {}, `${d.label} ${formatValue(d, r.nutrients[d.key] || 0)}`)))] : []));
+    };
+    qty.addEventListener("input", update);
+    unitSel?.addEventListener("change", update);
+
+    saveBtn.addEventListener("click", () => {
+      const r = compute();
+      if (!r) return;
+      const before = { grams: m.grams, qtyText: m.qtyText || `${m.grams}g`, nutrients: m.nutrients || {} };
+      updateMeal(m.id, r).catch(writeFailed(`${displayName(m)} の量の変更`));
+      editingId = null;
+      editPanel = null;
+      drawList();
+      toast(`${displayName(m)} の量を変更しました`, {
+        duration: 6000,
+        action: { label: "元に戻す", onClick: () => updateMeal(m.id, before).catch(() => toast("元に戻せませんでした。", { error: true, duration: 6000 })) },
+      });
+    });
+
+    panel.replaceChildren(
+      el("div", { class: "row2" }, qty, ...(unitSel ? [unitSel] : [el("span", { class: "unit" }, "人前")])),
+      preview,
+      saveBtn,
+      el("div", { class: "edit-actions" },
+        el("button", { type: "button", class: "btn btn-link", onclick: () => { editingId = null; editPanel = null; drawList(); } }, "閉じる"),
+        el("button", { type: "button", class: "btn btn-link edit-delete", onclick: () => { editingId = null; editPanel = null; removeMeal(m); } }, "この記録を削除")));
+    update();
+  }
+
+  // 1件の記録。左スワイプで削除(「元に戻す」付き)、タップで量の変更。大きな削除ボタンは置かない
   function mealRow(m) {
     const n = m.nutrients || {};
-    return el("li", { class: "meal" },
-      el("div", { class: "meal-main" },
-        el("div", { class: "meal-name" }, m.name),
-        el("div", { class: "meal-sub" },
-          `${m.qtyText || `${m.grams}g`} ・ ${Math.round(n.kcal || 0)}kcal ・ P ${(n.protein || 0).toFixed(1)}g`)),
-      el("button", { type: "button", class: "del", "aria-label": `${m.name}を削除`, onclick: () => removeMeal(m) }, "削除"));
+    const open = editingId === m.id;
+    const reuse = open && editPanel?.id === m.id;
+    const panel = reuse ? editPanel.node : el("div", { class: "meal-edit", hidden: !open });
+    if (open && !reuse) editPanel = { id: m.id, node: panel };
+    const tap = el("button", { type: "button", class: "meal-tap", "aria-expanded": String(open) },
+      el("span", { class: "meal-name" }, displayName(m)),
+      el("span", { class: "meal-sub" }, `${qtyLabel(m)} ・ ${Math.round(n.kcal || 0)}kcal ・ P ${(n.protein || 0).toFixed(1)}g`));
+    tap.addEventListener("click", () => {
+      editingId = open ? null : m.id;
+      editPanel = null;
+      drawList();
+    });
+    const fg = el("div", { class: "swipe-fg" }, tap);
+    const row = el("li", { class: "meal-wrap" },
+      el("div", { class: "swipe-bg", "aria-hidden": "true" }, el("span", { class: "s-off" }, "← 削除"), el("span", { class: "s-on" }, "離すと削除")),
+      fg, panel);
+    swipeToDelete(row, fg, () => removeMeal(m));
+    if (open && !reuse) buildEditor(m, panel);
+    return row;
   }
 
   function drawList() {
@@ -179,7 +348,9 @@ export function renderToday(root, { query }) {
           mealsToRecipeItems(items).length >= 2
             ? el("button", { type: "button", class: "btn btn-link set-link", onclick: () => saveAsSet(s, items) }, "この食事をセットに保存")
             : null);
-      }));
+      }),
+      // 操作の手がかり(大きな削除ボタンをなくしたため)。記録があるときだけ出す
+      ...(meals.length && showHint ? [el("p", { class: "hint swipe-hint" }, "記録は左にスワイプで削除、タップで量を変更できます。")] : []));
   }
 
   const redraw = () => { drawSummary(); drawList(); };
@@ -198,12 +369,15 @@ export function renderToday(root, { query }) {
     }
   );
 
+  // 表示名(食材マスタで設定したもの)を反映する。読み込めなくても、整形した名前で表示する
+  ensureUserData().then(() => { if (alive) drawList(); }).catch(() => {});
+
   getMealsOn(prevDate)
     .then((data) => { if (alive) { prevMeals = data; drawList(); } })
     .catch(() => {}); // 取得できなければコピーのボタンを出さないだけ
 
   getGoals(DEFAULT_GOALS)
-    .then((g) => { if (alive) { goals = g; redraw(); } })
+    .then((g) => { if (alive) { goals = g; drawSummary(); } })
     .catch(() => {}); // 取得できなければ初期値のまま表示
 
   return () => { alive = false; unwatch(); };

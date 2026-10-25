@@ -175,6 +175,40 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 }
 .add-btn { min-height: 44px; font-size: 16px; text-align: center; text-decoration: none; line-height: 24px; }
 
+/* 食事の行: 左スワイプで削除(背面に赤)、タップで量を変更 */
+.meal-wrap { position: relative; overflow: hidden; border-top: 1px solid var(--divider); }
+.swipe-bg {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 18px; background: var(--danger); color: var(--on-danger); font-weight: 700; font-size: 16px;
+}
+.swipe-bg .s-on { display: none; }
+.swipe-armed .swipe-bg { filter: brightness(0.9); }
+.swipe-armed .swipe-bg .s-off { display: none; }
+.swipe-armed .swipe-bg .s-on { display: inline; }
+/* 行がタップできることの手がかり(›。開くと下向き) */
+.meal-tap { position: relative; padding-right: 26px; }
+.meal-tap::after { content: "›"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--muted); }
+.meal-tap[aria-expanded="true"]::after { transform: translateY(-50%) rotate(90deg); }
+.swipe-fg { position: relative; background: var(--surface); touch-action: pan-y; }
+.meal-tap {
+  display: block; width: 100%; min-height: 52px; padding: 8px 0; text-align: left; font: inherit; color: inherit;
+  background: none; border: 0;
+}
+.meal-tap .meal-name, .meal-tap .meal-sub { display: block; }
+.meal-edit { padding: 4px 0 12px; }
+.edit-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.edit-delete { color: var(--danger); }
+.hint.swipe-hint { margin: 0 0 8px; }
+/* 摂取量/残り量の切り替え */
+.summary { position: relative; cursor: pointer; }
+.mode-seg { display: flex; justify-content: flex-end; gap: 6px; margin: -6px -6px 6px 0; }
+.mode-btn {
+  min-height: 44px; padding: 0 12px; font-size: 14px; font-weight: 600; color: var(--text-sub);
+  background: none; border: 1px solid var(--border); border-radius: 10px;
+}
+.mode-btn.on { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
+.reached-text-big { color: var(--accent-dark); }
+
 /* テーマ選択: カード自身に data-theme が付くので、各カードはそのテーマの色で表示される */
 .theme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .theme-card {

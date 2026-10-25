@@ -1,7 +1,7 @@
 // 食材検索ピッカー(レシピ編集などで使う)。検索して選んだ食材を onPick に渡す。
 import { el } from "./ui.js";
-import { loadFoods, setUserData, searchFoods } from "./foods.js";
-import { listCustomFoods, getUnitOverrides } from "./db.js";
+import { loadFoods, setUserData, searchFoods, displayName } from "./foods.js";
+import { listCustomFoods, getUnitOverrides, getDisplayNames } from "./db.js";
 
 // 自作食材・単位の読み込みは1回だけ(失敗時は次回やり直す)。食材マスタを編集したら invalidate すること。
 let userDataPromise = null;
@@ -13,9 +13,9 @@ export function invalidateUserData() {
 export function ensureUserData() {
   if (!userDataPromise) {
     const gen = generation;
-    userDataPromise = Promise.all([listCustomFoods(), getUnitOverrides()])
-      .then(([customFoods, unitOverrides]) => {
-        if (gen === generation) setUserData({ customFoods, unitOverrides });
+    userDataPromise = Promise.all([listCustomFoods(), getUnitOverrides(), getDisplayNames()])
+      .then(([customFoods, unitOverrides, names]) => {
+        if (gen === generation) setUserData({ customFoods, unitOverrides, names });
       })
       .catch((e) => {
         if (gen === generation) userDataPromise = null;
@@ -44,7 +44,7 @@ export function createFoodPicker({ onPick, placeholder = "食材名で検索(例
     }
     hits.forEach((f) => {
       const btn = el("button", { type: "button", class: "list-item" },
-        el("span", { class: "name" }, f.name),
+        el("span", { class: "name" }, displayName(f)),
         el("span", { class: "meta" },
           `${f.source === "custom" ? "自作 ・ " : ""}たんぱく質 ${(f.n.protein ?? 0).toFixed(1)}g / ${Math.round(f.n.kcal ?? 0)}kcal(100g)`));
       btn.addEventListener("click", () => {

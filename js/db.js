@@ -205,6 +205,27 @@ export async function deleteUnitOverride(foodId) {
   return fs.deleteDoc(fs.doc(col("unitOverrides"), foodId));
 }
 
+// 成分表の食材の表示名: displayNames/{foodId} = { name }。元の名前は食材データ側に残る。
+export async function getDisplayNames() {
+  const snap = await fs.getDocs(col("displayNames"));
+  const out = {};
+  snap.docs.forEach((d) => { const name = d.data().name; if (typeof name === "string" && name) out[d.id] = name; });
+  return out;
+}
+
+export function saveDisplayName(foodId, name) {
+  return fs.setDoc(fs.doc(col("displayNames"), foodId), { name, updatedAt: fs.serverTimestamp() });
+}
+
+export async function deleteDisplayName(foodId) {
+  return fs.deleteDoc(fs.doc(col("displayNames"), foodId));
+}
+
+// 食事の量を変更する(グラム・数量の表記・栄養素のスナップショット)。呼び出し側は await せず catch すること。
+export async function updateMeal(id, { grams, qtyText, nutrients }) {
+  return fs.updateDoc(fs.doc(col("meals"), id), { grams, qtyText, nutrients });
+}
+
 // { [foodId]: [{name, g}] }
 export async function getUnitOverrides() {
   const snap = await fs.getDocs(col("unitOverrides"));

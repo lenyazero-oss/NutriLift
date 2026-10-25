@@ -2,6 +2,7 @@
 import { el } from "../ui.js";
 import { createFoodPicker } from "../food-picker.js";
 import { listCustomFoods } from "../db.js";
+import { displayName } from "../foods.js";
 import { navigate } from "../router.js";
 
 export function renderFoodMaster(root) {
@@ -31,7 +32,7 @@ export function renderFoodMaster(root) {
       list.sort((a, b) => String(a.name).localeCompare(String(b.name), "ja"));
       customBox.replaceChildren(...(list.length
         ? list.map((f) => el("li", {}, el("a", { class: "list-item", href: `#/foodedit/custom/${encodeURIComponent(f.id)}` },
-            el("span", { class: "name" }, f.name),
+            el("span", { class: "name" }, displayName(f)),
             el("span", { class: "meta" }, `たんぱく質 ${(f.n?.protein ?? 0).toFixed(1)}g / ${Math.round(f.n?.kcal ?? 0)}kcal(100g)`))))
         : [el("li", { class: "empty" }, "まだありません")]));
     })

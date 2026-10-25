@@ -14,7 +14,7 @@ const MODES = [
 const countLine = (current) =>
   [...COLLECTIONS, ...SINGLES]
     .map(({ key, label }) => {
-      const n = key in current.collections ? current.collections[key].length : current.singles[key] ? 1 : 0;
+      const n = key in current.collections ? current.collections[key]?.length ?? 0 : current.singles[key] ? 1 : 0;
       return n ? `${label} ${n}件` : null;
     })
     .filter(Boolean);

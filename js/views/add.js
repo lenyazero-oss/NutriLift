@@ -1,6 +1,6 @@
 // 食事追加: 食材検索 → グラム、または 単位×数量 → 記録
 import { el, toast, writeFailed } from "../ui.js";
-import { loadFoods, searchFoods, unitsFor } from "../foods.js";
+import { loadFoods, searchFoods, unitsFor, displayName } from "../foods.js";
 import { ensureUserData } from "../food-picker.js";
 import { loadUsage, recordUsage } from "../usage.js";
 import { addMeal, deleteMeal } from "../db.js";
@@ -81,7 +81,7 @@ export function renderAdd(root, { query }) {
         ? el("ul", { class: "list quick-list" }, list.map((u) => {
           const f = u.food;
           const btn = el("button", { type: "button", class: "list-item" },
-            el("span", { class: "name" }, f.name),
+            el("span", { class: "name" }, displayName(f)),
             el("span", { class: "meta" },
               `${quickMode === "recent" ? agoLabel(u.last) : `${u.count}回`} ・ たんぱく質 ${(f.n.protein ?? 0).toFixed(1)}g / ${Math.round(f.n.kcal ?? 0)}kcal(100g)`));
           btn.addEventListener("click", () => select(f));
@@ -119,7 +119,7 @@ export function renderAdd(root, { query }) {
     }
     hits.forEach((f) => {
       const btn = el("button", { type: "button", class: "list-item" },
-        el("span", { class: "name" }, f.name),
+        el("span", { class: "name" }, displayName(f)),
         el("span", { class: "meta" },
           `${f.source === "custom" ? "自作 ・ " : ""}たんぱく質 ${(f.n.protein ?? 0).toFixed(1)}g / ${Math.round(f.n.kcal ?? 0)}kcal(100g)`));
       btn.addEventListener("click", () => select(f));
@@ -130,7 +130,7 @@ export function renderAdd(root, { query }) {
   function select(food) {
     selected = food;
     results.replaceChildren();
-    search.value = food.name;
+    search.value = displayName(food);
     syncQuick();
     search.blur(); // キーボードを閉じてから量の入力へ
     formArea.replaceChildren(buildForm(food));
@@ -182,7 +182,7 @@ export function renderAdd(root, { query }) {
       try {
         const { id, done } = addMeal(meal);
         done.catch(saveError);
-        toast(`${food.name} を記録しました`, {
+        toast(`${displayName(food)} を記録しました`, {
           action: {
             label: "元に戻す",
             onClick: () => deleteMeal(id).catch(() => toast("取り消せませんでした。", { error: true })),
@@ -202,7 +202,7 @@ export function renderAdd(root, { query }) {
 
     update();
     return el("section", { class: "card" },
-      el("h2", {}, food.name),
+      el("h2", {}, displayName(food)),
       el("div", { class: "row2" }, qty, unitSel),
       units.length ? null : el("p", { class: "hint" }, "この食材にはまだ単位がありません(グラムのみ)。"),
       preview, saveBtn);

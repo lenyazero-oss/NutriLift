@@ -1,7 +1,7 @@
 // レシピの作成・編集: 名前、できあがりの人前数、食材(グラム)の一覧
 import { el, toast, writeFailed } from "../ui.js";
 import { createFoodPicker } from "../food-picker.js";
-import { unitsFor } from "../foods.js";
+import { unitsFor, displayName } from "../foods.js";
 import { getRecipe, saveRecipe, deleteRecipe } from "../db.js";
 import { navigate, setLeaveGuard } from "../router.js";
 import { recipePortion } from "../nutrients.js";
@@ -75,7 +75,7 @@ export function renderRecipeEdit(root, { args }) {
         ...items.map((it, i) => {
           const g = el("input", {
             type: "number", inputmode: "decimal", min: "0", step: "any", value: String(it.grams),
-            class: "g-input", "aria-label": `${it.name}のグラム数`,
+            class: "g-input", "aria-label": `${displayName(it)}のグラム数`,
           });
           g.addEventListener("focus", () => g.select());
           g.addEventListener("input", () => {
@@ -84,7 +84,7 @@ export function renderRecipeEdit(root, { args }) {
             updateTotals();
           });
           const del = el("button", {
-            type: "button", class: "del", "aria-label": `${it.name}を外す`,
+            type: "button", class: "del", "aria-label": `${displayName(it)}を外す`,
             onclick: () => {
               const [removed] = items.splice(i, 1);
               drawItems();
@@ -98,7 +98,7 @@ export function renderRecipeEdit(root, { args }) {
             },
           }, "外す");
           return el("li", { class: "meal item" },
-            el("div", { class: "meal-main" }, el("div", { class: "meal-name" }, it.name)),
+            el("div", { class: "meal-main" }, el("div", { class: "meal-name" }, displayName(it))),
             g, el("span", { class: "unit" }, "g"), del);
         }));
       if (!items.length) itemList.append(el("li", { class: "empty" }, "まだ食材がありません"));
@@ -115,7 +115,7 @@ export function renderRecipeEdit(root, { args }) {
         });
         drawItems();
         updateTotals();
-        toast(`${food.name} を追加しました`);
+        toast(`${displayName(food)} を追加しました`);
       },
     });
 
