@@ -1,6 +1,7 @@
 // 栄養素の定義。栄養素を追加するときは NUTRIENTS に1行足し、
 // foods.json 側に同じ key を出力する(tools/convert_foods.py の --extra)。
 // shown: true の項目が画面に表示される(最初は5項目)。
+// 追加したら firestore.rules の validGoals(許可キーと goal())にも同じ key を足すこと。
 export const NUTRIENTS = [
   { key: "protein", label: "たんぱく質", unit: "g", decimals: 1, shown: true },
   { key: "kcal", label: "エネルギー", unit: "kcal", decimals: 0, shown: true },
