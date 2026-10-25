@@ -26,7 +26,7 @@ GitHub Pages + Firebase(Spark プラン)で無料運用します。ビルド不�
 5. **Firestore を作成**: 構築 > Firestore Database > データベースを作成(本番モードで開始、ロケーションは `asia-northeast1`(東京) を推奨)。
 6. **ルールを反映**: Firestore > ルール タブに `firestore.rules` の内容を貼り付けて「公開」します。
    - `users/{uid}/` 配下は、ログイン中の本人(`request.auth.uid == uid`)のみ読み書き可。それ以外は全拒否です。
-7. **メールの新規登録は最初の1回のみ**: 自分のアカウント作成後は、Authentication > Sign-in method の設定や、不要なら他人の登録に注意してください(公開URLを知られても、ルールによりデータは読み書きできません)。
+7. **ログイン画面に新規登録ボタンはありません**: アカウントは Googleログイン、または Firebaseコンソール(Authentication > Users)で作成したメールアカウントで使います。他人の登録を防ぐため、使わないログイン方法は Authentication > Sign-in method で無効にしてください(公開URLを知られても、ルールによりデータは読み書きできません)。
 
 ## 2. GitHub Pages での公開
 

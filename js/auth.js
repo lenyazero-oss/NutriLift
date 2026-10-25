@@ -5,7 +5,6 @@ import {
   signInWithRedirect,
   getRedirectResult,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   onAuthStateChanged,
   signOut as fbSignOut,
@@ -34,11 +33,6 @@ export async function signInGoogle() {
 
 export function signInEmail(email, password) {
   return signInWithEmailAndPassword(auth, email, password);
-}
-
-// 予備ログイン用。初回のみ新規登録に使う
-export function signUpEmail(email, password) {
-  return createUserWithEmailAndPassword(auth, email, password);
 }
 
 export function resetPassword(email) {

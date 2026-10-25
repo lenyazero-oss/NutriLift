@@ -2,7 +2,6 @@ import { el } from "../ui.js";
 import {
   signInGoogle,
   signInEmail,
-  signUpEmail,
   resetPassword,
   authErrorMessage,
 } from "../auth.js";
@@ -44,25 +43,19 @@ export function renderLogin(root, { configured, initialError }) {
   googleBtn.addEventListener("click", run(googleBtn, "ログイン中…", signInGoogle));
 
   const email = el("input", {
-    type: "email", autocomplete: "email", autocapitalize: "off", autocorrect: "off",
+    type: "email", autocomplete: "username", autocapitalize: "off", autocorrect: "off",
     enterkeyhint: "next", placeholder: "メールアドレス", "aria-label": "メールアドレス",
   });
   const password = el("input", {
     type: "password", autocomplete: "current-password", enterkeyhint: "go",
-    placeholder: "パスワード(6文字以上)", "aria-label": "パスワード",
+    placeholder: "パスワード", "aria-label": "パスワード",
   });
 
   const loginBtn = el("button", { class: "btn btn-big btn-primary", type: "submit" }, "メールでログイン");
-  const signupBtn = el("button", { class: "btn", type: "button" }, "新規登録(初回のみ)");
   const resetBtn = el("button", { class: "btn btn-link", type: "button" }, "パスワードを忘れた");
-  buttons.push(googleBtn, loginBtn, signupBtn, resetBtn);
+  buttons.push(googleBtn, loginBtn, resetBtn);
 
   const doLogin = run(loginBtn, "ログイン中…", () => signInEmail(email.value.trim(), password.value));
-  signupBtn.addEventListener("click", () => {
-    // 新規登録時はiOSにパスワード自動生成を提案させる
-    password.autocomplete = "new-password";
-    return run(signupBtn, "登録中…", () => signUpEmail(email.value.trim(), password.value))();
-  });
   resetBtn.addEventListener(
     "click",
     run(resetBtn, "送信中…", async () => {
@@ -73,10 +66,11 @@ export function renderLogin(root, { configured, initialError }) {
   );
 
   // フォームで包み、キーボードのEnter(開始)でもログインできるようにする
-  const form = el("form", { class: "card" }, email, password, loginBtn, signupBtn, resetBtn);
+  const form = el("form", { class: "card" },
+    el("p", { class: "hint" }, "メールでログイン(登録済みのアカウントのみ。この画面からは新しく登録できません)"),
+    email, password, loginBtn, resetBtn);
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    password.autocomplete = "current-password";
     doLogin();
   });
 
@@ -88,7 +82,7 @@ export function renderLogin(root, { configured, initialError }) {
       "Firebaseの設定が未入力です。js/firebase-config.js を編集してください。"),
     msgBox,
     el("section", { class: "card" }, googleBtn,
-      el("p", { class: "hint" }, "ホーム画面から開いてGoogleログインに失敗する場合は、下のメールログインを使ってください。")),
+      el("p", { class: "hint" }, "ホーム画面から開いてGoogleログインに失敗する場合は、下のメールログイン(登録済みの方のみ)を使ってください。")),
     form,
   ].filter(Boolean));
 }
