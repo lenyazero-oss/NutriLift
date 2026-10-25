@@ -225,7 +225,7 @@ export function renderToday(root, { query }) {
       suggestBox.replaceChildren(
         el("span", { class: "suggest-lead" }, `あと${remain.toFixed(0)}g:`),
         ...list.map((s) =>
-          el("a", { class: "suggest-link", href: `#/add?date=${date}&slot=${slotKey}&food=${s.food.source}:${encodeURIComponent(s.food.id)}` }, s.text)),
+          el("a", { class: "suggest-link", href: `#/add?date=${date}&slot=${slotKey}&food=${s.food.source}:${encodeURIComponent(s.food.id)}&g=${s.grams}` }, s.text)),
         el("span", { class: "suggest-note" }, `タップで${slotName}に追加`));
       suggestBox.hidden = false;
     } catch { suggestBox.hidden = true; } // 提案できなくても、画面の他の部分には影響しない

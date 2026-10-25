@@ -14,7 +14,7 @@ export function agoLabel(last) {
   return days < 7 ? `${days}日前` : `${m}/${d}`;
 }
 
-// onPick(food): 食材を選んだとき。戻り値の node を画面に置き、setVisible で出し入れ、refresh で集計を読み込む。
+// onPick(food, lastQty): 食材を選んだとき。戻り値の node を画面に置き、setVisible で出し入れ、refresh で集計を読み込む。
 export function createQuickFoods({ onPick }) {
   const node = el("section", { class: "quick", hidden: true });
   let usage = null;
@@ -40,7 +40,7 @@ export function createQuickFoods({ onPick }) {
             el("span", { class: "name" }, displayName(f)),
             el("span", { class: "meta" },
               `${mode === "recent" ? agoLabel(u.last) : `${u.count}回`} ・ たんぱく質 ${(f.n.protein ?? 0).toFixed(1)}g / ${Math.round(f.n.kcal ?? 0)}kcal(100g)`));
-          btn.addEventListener("click", () => onPick(f));
+          btn.addEventListener("click", () => onPick(f, u.lastQty)); // 前回の量(なければ null)
           return el("li", {}, btn);
         }))
         : el("p", { class: "hint" }, "記録すると、ここに最近使った食材とよく使う食材が表示されます。"));

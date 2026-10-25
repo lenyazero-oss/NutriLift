@@ -13,12 +13,22 @@ export function invalidateUsage() {
 }
 
 // 食事を記録した直後に、読み直さずに集計へ反映する(Firestoreの読み取りを増やさないため)
-export function recordUsage(food) {
+// lastQty: 記録した量 { qtyText, grams }(次に同じ食材を選んだとき、前回と同じ量で始めるため)
+// date: 記録した日。未来日は数えず、最終日・前回の量は新しい日付のものだけで更新する(集計の読み込みと同じ扱い)
+export function recordUsage(food, lastQty = null, date = dateStr()) {
   if (!cache || cache.uid !== currentUid()) return;
-  const today = dateStr();
+  if (date > dateStr()) return;
   const s = cache.stats.find((x) => x.foodId === food.id && x.source === food.source);
-  if (s) { s.count++; s.last = today; }
-  else cache.stats.push({ source: food.source, foodId: food.id, count: 1, last: today });
+  if (!s) {
+    cache.stats.push({ source: food.source, foodId: food.id, count: 1, last: date, lastAt: Infinity, lastQty });
+    return;
+  }
+  s.count++;
+  if (date >= s.last) { // いま記録したものが、同じ日の中でも一番新しい
+    s.last = date;
+    s.lastAt = Infinity;
+    if (lastQty) s.lastQty = lastQty;
+  }
 }
 
 // レシピを記録した直後に、最終使用日へ反映する(レシピ一覧の「最近使った順」用)
@@ -52,9 +62,15 @@ async function loadCache(uid) {
       }
       if (!m.foodId) continue;
       const key = `${m.source}:${m.foodId}`;
-      const s = stats.get(key) || { source: m.source, foodId: m.foodId, count: 0, last: "" };
+      const s = stats.get(key) || { source: m.source, foodId: m.foodId, count: 0, last: "", lastAt: 0, lastQty: null };
       s.count++;
-      if (m.date > s.last) s.last = m.date;
+      // 一番新しい記録を、日付 → 作成時刻の順で決める(読み込み順はIDで決まり、時系列ではない)
+      const at = m.createdAt?.toMillis?.() ?? 0;
+      if (m.date > s.last || (m.date === s.last && at >= s.lastAt)) {
+        s.last = m.date;
+        s.lastAt = at;
+        s.lastQty = m.qtyText && m.grams > 0 ? { qtyText: m.qtyText, grams: m.grams } : null;
+      }
       stats.set(key, s);
     }
     // 読み込み中にユーザーが変わっていたら、前のユーザーの集計を保存しない

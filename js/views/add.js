@@ -52,7 +52,7 @@ export function renderAdd(root, { query }) {
   const formArea = el("div");
 
   // 検索欄が空で食材も選んでいないときだけ、「最近」「よく使う」の食材を出す(直近60日の記録から集計。共通部品)
-  const quick = createQuickFoods({ onPick: (food) => select(food) });
+  const quick = createQuickFoods({ onPick: (food, lastQty) => select(food, lastQty) });
   const syncQuick = () => quick.setVisible(search.value.trim() === "" && selected === null);
 
   search.addEventListener("input", () => {
@@ -81,17 +81,18 @@ export function renderAdd(root, { query }) {
     });
   }
 
-  function select(food) {
+  // init: 量の初期値 { qtyText?, grams }(前回の量、または提案の量)。なければ 100g
+  function select(food, init = null) {
     selected = food;
     results.replaceChildren();
     search.value = displayName(food);
     syncQuick();
     search.blur(); // キーボードを閉じてから量の入力へ
-    formArea.replaceChildren(buildForm(food));
+    formArea.replaceChildren(buildForm(food, init));
     formArea.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
-  function buildForm(food) {
+  function buildForm(food, init) {
     const units = unitsFor(food);
     const unitSel = el("select", { "aria-label": "単位" },
       el("option", { value: "g" }, "グラム (g)"),
@@ -99,6 +100,18 @@ export function renderAdd(root, { query }) {
     const qty = el("input", { type: "number", inputmode: "decimal", min: "0", step: "any", value: "100", "aria-label": "量" });
     const preview = el("div", { class: "preview", "aria-live": "polite" });
     const saveBtn = el("button", { type: "button", class: "btn btn-big btn-primary" }, "記録する");
+
+    // 初期値: 前回の「2個」「150g」を再現する。単位が今の一覧になければグラムで入れる
+    if (init?.grams >= 0.1) { // 丸めて 0 になる極小の値は使わない
+      const m = /^([0-9]+(?:\.[0-9]+)?)(.+)$/.exec(init.qtyText || "");
+      const idx = m && m[2] !== "g" ? units.findIndex((u) => u.name === m[2]) : -1;
+      if (idx >= 0 && Number(m[1]) > 0) {
+        unitSel.value = String(idx);
+        qty.value = m[1];
+      } else {
+        qty.value = String(Math.round(init.grams * 10) / 10);
+      }
+    }
 
     const grams = () => {
       const q = parseFloat(qty.value);
@@ -114,8 +127,15 @@ export function renderAdd(root, { query }) {
       ].filter(Boolean)); // null が「null」と表示されないように除く
       saveBtn.disabled = !(g > 0);
     };
+    // 単位を変えたら、いま入れている量を新しい単位に換算する(換算できないときは 100g / 1 から)
+    let prevUnit = unitSel.value;
     unitSel.addEventListener("change", () => {
-      qty.value = unitSel.value === "g" ? "100" : "1";
+      const q = parseFloat(qty.value);
+      const oldG = q > 0 ? (prevUnit === "g" ? q : q * units[Number(prevUnit)].g) : 0;
+      let next = unitSel.value === "g" ? Math.round(oldG * 10) / 10 : Math.round((oldG / units[Number(unitSel.value)].g) * 2) / 2;
+      if (!(next > 0)) next = unitSel.value === "g" ? 100 : 1;
+      qty.value = String(next);
+      prevUnit = unitSel.value;
       update();
     });
     qty.addEventListener("input", update);
@@ -149,7 +169,7 @@ export function renderAdd(root, { query }) {
       selected = null;
       search.value = "";
       formArea.replaceChildren();
-      recordUsage(food); // 記録した食材を、読み直さずに「最近」「よく使う」へ反映する
+      recordUsage(food, { qtyText, grams: meal.grams }, date); // 記録した食材を、読み直さずに「最近」「よく使う」へ反映する
       syncQuick();
       quick.refresh().then(syncQuick); // 記録した食材を反映し、検索欄が空なら「最近」を再表示する
       // キーボードを出さない(トーストと結果を見やすくするため)。次の食材は検索欄をタップして入力
@@ -159,6 +179,7 @@ export function renderAdd(root, { query }) {
     return el("section", { class: "card" },
       el("h2", {}, displayName(food)),
       el("div", { class: "row2" }, qty, unitSel),
+      init?.grams > 0 ? el("p", { class: "hint" }, init.qtyText ? `前回の量(${init.qtyText})で始めています。` : `提案の量(約${Math.round(init.grams * 10) / 10}g)で始めています。`) : null,
       units.length ? null : el("p", { class: "hint" }, "この食材にはまだ単位がありません(グラムのみ)。"),
       preview, saveBtn);
   }
@@ -186,11 +207,17 @@ export function renderAdd(root, { query }) {
     search.disabled = false;
     // 不足分の提案などから開いたときは、その食材を選んだ状態にする(?food=table:01001)。
     // 成分表の食材はすぐ選べる。自作食材は、ユーザーデータの取得後に選ぶ。検索欄に入力済みなら上書きしない
+    let preselected = false; // 記録後の再呼び出しで、同じ食材をまた選ばない
     const preselect = () => {
-      if (!query.food || selected || search.value.trim()) return;
+      if (preselected || !query.food || selected || search.value.trim()) return;
       const i = query.food.indexOf(":");
       const f = i > 0 ? findFood(query.food.slice(i + 1), query.food.slice(0, i)) : null;
-      if (f) select(f);
+      // 提案の量(&g=150)があれば、その量で始める(範囲外の値は無視)
+      const g = parseFloat(query.g);
+      if (f) {
+        preselected = true;
+        select(f, g > 0 && g <= 100000 ? { grams: g } : null);
+      }
     };
     preselect();
     // 自動フォーカスはしない(キーボードで「最近」「よく使う」の食材が隠れるため。検索欄をタップして入力)

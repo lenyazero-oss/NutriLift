@@ -1,9 +1,11 @@
 // 静的ファイルのキャッシュ(オフライン起動用)。更新時は VERSION を上げる。
 // 注意: ファイルを追加したら ASSETS にも追記すること(1つでも404だとインストールが失敗する)。
-const VERSION = "v55";
+const VERSION = "v56";
 const CACHE = `meal-app-${VERSION}`;
 // Firebase SDK(バージョン固定)用。アプリの更新(VERSION)では削除しない。SDKを更新したら名前を変える。
 const SDK_CACHE = "meal-sdk-v1";
+// data/*.json(食材データ・単位の初期値)用。VERSION を上げても消さず、次の更新までオフラインで使えるようにする。
+const DATA_CACHE = "meal-data-v1";
 const NETWORK_TIMEOUT_MS = 4000;
 const ASSETS = [
   "./",
@@ -43,7 +45,7 @@ const ASSETS = [
   "./js/usage.js",
   "./js/profile.js",
   "./js/util.js",
-  // data/*.json は初回アクセス時にキャッシュされる(未生成でもインストールが失敗しないよう除外)
+  // data/*.json は初回アクセス時に DATA_CACHE へ保存する(未生成でもインストールが失敗しないよう除外)
 ];
 
 self.addEventListener("install", (e) => {
@@ -53,7 +55,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== SDK_CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== SDK_CACHE && k !== DATA_CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -72,7 +74,8 @@ async function networkFirst(e, req) {
     const res = await (cached ? withTimeout(request, NETWORK_TIMEOUT_MS) : request);
     if (res.ok && res.type === "basic") {
       const copy = res.clone();
-      e.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {}));
+      const name = new URL(req.url).pathname.includes("/data/") ? DATA_CACHE : CACHE;
+      e.waitUntil(caches.open(name).then((c) => c.put(req, copy)).catch(() => {}));
     }
     return res;
   } catch {

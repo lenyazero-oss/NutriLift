@@ -3,6 +3,7 @@ import { el, toast } from "../ui.js";
 import { readAllData, writeAllData, getMealTimes } from "../db.js";
 import { buildBackup, parseBackup, planImport, COLLECTIONS, SINGLES, MAX_FILE_BYTES } from "../backup.js";
 import { invalidateUserData } from "../food-picker.js";
+import { invalidateUsage } from "../usage.js";
 import { setLeaveGuard } from "../router.js";
 import { dateStr, setSlotTimes } from "../util.js";
 
@@ -198,6 +199,7 @@ export function renderBackup(root) {
       try {
         await writeAllData(plan.ops, (done, total) => { if (alive) progress.textContent = `書き込み中… ${done} / ${total}`; });
         invalidateUserData(); // 自作食材・単位が変わったので、検索用のキャッシュを捨てる
+        invalidateUsage(); // 食事・レシピが変わったので、「最近/よく使う」の集計も捨てる
         getMealTimes().then((t) => setSlotTimes(t)).catch(() => {}); // 食事区分の時間帯も、再起動せずに反映する
         if (alive) {
           importBox.hidden = true;
@@ -210,6 +212,7 @@ export function renderBackup(root) {
         }
       } catch (e) {
         invalidateUserData();
+        invalidateUsage();
         if (alive) {
           // 途中まで書き込まれている可能性があるので、現在のデータを読み直して計画を作り直す(続きから進められる)
           try { current = await readAllData(); } catch { /* 読めなければ、前の計画のまま */ }
