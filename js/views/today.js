@@ -425,12 +425,25 @@ export function renderToday(root, { query }) {
       drawList();
     });
     const fg = el("div", { class: "swipe-fg" }, tap);
-    const row = el("li", { class: "meal-wrap" },
+    // 背面の赤い帯は、この行の見出し(box)の中だけ。編集フォーム(panel)は帯の外に置く(帯がフォームを覆い隠さないように)
+    const box = el("div", { class: "swipe-box" },
       el("div", { class: "swipe-bg", "aria-hidden": "true" }, el("span", { class: "s-off" }, "← 削除"), el("span", { class: "s-on" }, "離すと削除")),
-      fg, panel);
-    swipeToDelete(row, fg, () => removeMeal(m));
+      fg);
+    const row = el("li", { class: "meal-wrap" }, box, panel);
+    swipeToDelete(box, fg, () => removeMeal(m));
     if (open && !reuse) buildEditor(m, panel);
     return row;
+  }
+
+  // 食事枠の開閉。記録があっても閉じて、1日の全体を短く見られる。閉じた枠は端末に覚えておく
+  const collapsed = new Set();
+  try { JSON.parse(localStorage.getItem("collapsedSlots") || "[]").forEach((k) => collapsed.add(k)); } catch { /* 読めなければ、すべて開く */ }
+  const slotHadItems = {}; // 前回の描画で記録があったか(空だった枠に最初の1品が入ったら、自動で開く)
+  function toggleSlot(key) {
+    if (editingId && meals.some((m) => m.id === editingId && m.slot === key)) { editingId = null; editPanel = null; }
+    if (collapsed.has(key)) collapsed.delete(key); else collapsed.add(key);
+    try { localStorage.setItem("collapsedSlots", JSON.stringify([...collapsed])); } catch { /* 保存できなくても開閉はできる */ }
+    drawList();
   }
 
   function drawList() {
@@ -445,6 +458,7 @@ export function renderToday(root, { query }) {
         const href = `#/add?date=${date}&slot=${s.key}`;
         // 空の枠は1行にまとめて、1日の全体がスクロールなしで見えるようにする
         if (!items.length) {
+          if (loaded) slotHadItems[s.key] = false;
           // 前日の同じ食事があるときだけ、コピーのボタンを下に出す
           // 今日の記録を読み込む前は出さない(すでに記録のある枠に出て、二重にコピーするのを防ぐ)
           const prev = loaded ? mealsInSlot(prevMeals, s.key) : [];
@@ -460,10 +474,29 @@ export function renderToday(root, { query }) {
               : null,
             el("a", { class: "btn add-inline", href, "aria-label": `${s.label}に追加` }, "＋ 追加"));
         }
+        // 空だった枠に最初の記録が入ったら開く(閉じたまま、足した記録が見えない状態を避ける)。読み込み前は判定しない
+        if (loaded) {
+          if (slotHadItems[s.key] === false && collapsed.has(s.key)) {
+            collapsed.delete(s.key);
+            try { localStorage.setItem("collapsedSlots", JSON.stringify([...collapsed])); } catch { /* 保存できなくても開く */ }
+          }
+          slotHadItems[s.key] = true;
+        }
+        const isCollapsed = collapsed.has(s.key);
+        // 見出し全体が開閉ボタン(左に矢印、タイトルとチップの下に合計)。閉じているときは「＋ 追加」を右に出す。
+        // ボタンの名前は中身(朝・適量・合計)に任せ、開閉の状態は aria-expanded で伝える
+        const head = el("div", { class: "slot-head slot-head-row" },
+          el("h2", {},
+            el("button", { type: "button", class: "slot-toggle", "aria-expanded": String(!isCollapsed), onclick: () => toggleSlot(s.key) },
+              el("span", { class: "slot-chev", "aria-hidden": "true" }, "›"),
+              el("span", { class: "slot-left" },
+                el("span", { class: "slot-title" }, s.label,
+                  s.key !== "snack" ? el("span", { class: `protein-chip ${proteinState(t.protein || 0)[1]}` }, proteinState(t.protein || 0)[0]) : null),
+                sum))),
+          isCollapsed ? el("a", { class: "btn add-inline", href, "aria-label": `${s.label}に追加` }, "＋ 追加") : null);
+        if (isCollapsed) return el("section", { class: "card slot slot-collapsed" }, head);
         return el("section", { class: "card slot" },
-          el("div", { class: "slot-head" },
-            el("h2", {}, s.label, s.key !== "snack" ? el("span", { class: `protein-chip ${proteinState(t.protein || 0)[1]}` }, proteinState(t.protein || 0)[0]) : null),
-            sum),
+          head,
           el("ul", { class: "meals" }, items.map(mealRow)),
           el("a", { class: "btn add-btn", href }, `＋ ${s.label}に追加`),
           // 2品以上の食事だけ、セットにできる(1品だけのセットは意味が薄く、カードも煩雑になる)

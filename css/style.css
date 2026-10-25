@@ -176,7 +176,23 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 .add-btn { min-height: 44px; font-size: 16px; text-align: center; text-decoration: none; line-height: 24px; }
 
 /* 食事の行: 左スワイプで削除(背面に赤)、タップで量を変更 */
-.meal-wrap { position: relative; overflow: hidden; border-top: 1px solid var(--divider); }
+.meal-wrap { border-top: 1px solid var(--divider); }
+.swipe-box { position: relative; overflow: hidden; }
+/* 食事枠の開閉ボタン(見出し全体) */
+.slot-head-row { align-items: center; gap: 8px; margin-bottom: 0; }
+.slot-head-row h2 { flex: 1; min-width: 0; }
+.slot-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 0; text-align: left;
+  font: inherit; color: inherit; background: none; border: 0; border-radius: 8px;
+}
+.slot-toggle:active { background: var(--divider); }
+.slot-title { display: block; font-size: 19px; font-weight: 700; line-height: 1.25; }
+.slot-toggle .slot-sum { font-weight: 400; white-space: nowrap; font-size: 13px; line-height: 1.3; }
+/* 矢印は、開いているときに下向き(›を90度回す)。食事の行と同じ字形 */
+.slot-chev { flex: none; width: 20px; text-align: center; font-size: 22px; line-height: 1; color: var(--muted); transform: rotate(90deg); }
+.slot-toggle[aria-expanded="false"] .slot-chev { transform: none; }
+.slot-collapsed { padding-top: 6px; padding-bottom: 6px; }
+.slot:not(.slot-collapsed) .slot-head-row { margin-bottom: 6px; }
 .swipe-bg {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end;
   padding-right: 18px; background: var(--danger); color: var(--on-danger); font-weight: 700; font-size: 16px;
