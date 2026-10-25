@@ -24,8 +24,9 @@ service cloud.firestore {
 
     // 食事記録(スナップショット)
     function validMeal(d) {
-      return d.keys().hasOnly(['date', 'slot', 'foodId', 'source', 'recipeId', 'name', 'grams', 'qtyText', 'nutrients', 'createdAt'])
+      return d.keys().hasOnly(['date', 'slot', 'foodId', 'source', 'recipeId', 'name', 'grams', 'qtyText', 'nutrients', 'items', 'createdAt'])
         && d.keys().hasAll(['date', 'slot', 'source', 'name', 'grams', 'qtyText', 'nutrients'])
+        && (!('items' in d) || (d.items is list && d.items.size() <= 200))
         && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && d.slot in ['morning', 'noon', 'night', 'snack']
         && d.source in ['table', 'custom', 'recipe']
@@ -67,6 +68,16 @@ service cloud.firestore {
         && d.keys().hasAll(['date', 'kg'])
         && d.date == id && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && num(d.kg, 20, 400)
+        && d.get('updatedAt', request.time) is timestamp;
+    }
+
+    // 食事区分の時間帯: settings/mealTimes = { morningEnd, noonEnd, snackEnd }(1〜23の整数で 朝 < 昼 < 間食)
+    function validMealTimes(d) {
+      return d.keys().hasOnly(['morningEnd', 'noonEnd', 'snackEnd', 'updatedAt'])
+        && d.keys().hasAll(['morningEnd', 'noonEnd', 'snackEnd'])
+        && d.morningEnd is int && d.noonEnd is int && d.snackEnd is int
+        && d.morningEnd >= 1 && d.snackEnd <= 23
+        && d.morningEnd < d.noonEnd && d.noonEnd < d.snackEnd
         && d.get('updatedAt', request.time) is timestamp;
     }
 
@@ -134,6 +145,10 @@ service cloud.firestore {
       match /settings/goals {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validGoals(request.resource.data);
+      }
+      match /settings/mealTimes {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validMealTimes(request.resource.data);
       }
       match /settings/profile {
         allow read, delete: if isOwner(uid);

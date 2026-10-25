@@ -1,10 +1,10 @@
 // バックアップ: 全データをJSONファイルに書き出す / ファイルから読み込む(統合・上書き)
 import { el, toast } from "../ui.js";
-import { readAllData, writeAllData } from "../db.js";
+import { readAllData, writeAllData, getMealTimes } from "../db.js";
 import { buildBackup, parseBackup, planImport, COLLECTIONS, SINGLES, MAX_FILE_BYTES } from "../backup.js";
 import { invalidateUserData } from "../food-picker.js";
 import { setLeaveGuard } from "../router.js";
-import { dateStr } from "../util.js";
+import { dateStr, setSlotTimes } from "../util.js";
 
 const MODES = [
   { key: "merge", label: "統合", sub: "同じ記録は新しい方を残す" },
@@ -198,6 +198,7 @@ export function renderBackup(root) {
       try {
         await writeAllData(plan.ops, (done, total) => { if (alive) progress.textContent = `書き込み中… ${done} / ${total}`; });
         invalidateUserData(); // 自作食材・単位が変わったので、検索用のキャッシュを捨てる
+        getMealTimes().then((t) => setSlotTimes(t)).catch(() => {}); // 食事区分の時間帯も、再起動せずに反映する
         if (alive) {
           importBox.hidden = true;
           // トーストは数秒で消えるため、結果は画面にも残す

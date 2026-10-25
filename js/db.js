@@ -106,6 +106,22 @@ export async function deleteRecipe(id) {
   return fs.deleteDoc(fs.doc(col("recipes"), id));
 }
 
+// 食事区分の時間帯: settings/mealTimes = { morningEnd, noonEnd, snackEnd }。未設定なら null。
+export async function getMealTimes() {
+  const snap = await fs.getDoc(fs.doc(col("settings"), "mealTimes"));
+  return snap.exists() ? snap.data() : null;
+}
+
+// 呼び出し側は await せず、エラーだけ catch すること
+export function saveMealTimes(times) {
+  const { morningEnd, noonEnd, snackEnd } = times;
+  return fs.setDoc(fs.doc(col("settings"), "mealTimes"), { morningEnd, noonEnd, snackEnd, updatedAt: fs.serverTimestamp() });
+}
+
+export async function deleteMealTimes() {
+  return fs.deleteDoc(fs.doc(col("settings"), "mealTimes"));
+}
+
 // 目標値(未設定の項目は初期値で補う)
 export async function getGoals(defaults) {
   const snap = await fs.getDoc(fs.doc(col("settings"), "goals"));
@@ -244,8 +260,11 @@ export async function deleteDisplayName(foodId) {
 }
 
 // 食事の量を変更する(グラム・数量の表記・栄養素のスナップショット)。呼び出し側は await せず catch すること。
-export async function updateMeal(id, { grams, qtyText, nutrients }) {
-  return fs.updateDoc(fs.doc(col("meals"), id), { grams, qtyText, nutrients });
+// items(レシピの記録の食材の内訳)は、ある記録だけ一緒に更新する
+export async function updateMeal(id, { grams, qtyText, nutrients, items }) {
+  const data = { grams, qtyText, nutrients };
+  if (Array.isArray(items)) data.items = items;
+  return fs.updateDoc(fs.doc(col("meals"), id), data);
 }
 
 // { [foodId]: [{name, g}] }

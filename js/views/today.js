@@ -1,6 +1,6 @@
 // 今日の画面: 日付移動、目標に対する達成バー、朝/昼/夜/間食ごとの記録一覧
 import { el, toast, writeFailed } from "../ui.js";
-import { watchMeals, getGoals, deleteMeal, restoreMeal, getMealsOn, updateMeal, watchWeight, saveWeight, deleteWeight } from "../db.js";
+import { watchMeals, getGoals, deleteMeal, restoreMeal, getMealsOn, updateMeal, getRecipe, watchWeight, saveWeight, deleteWeight } from "../db.js";
 import { loadFoods, findFood, unitsFor, displayName } from "../foods.js";
 import { ensureUserData } from "../food-picker.js";
 import { swipeToDelete } from "../swipe.js";
@@ -321,6 +321,23 @@ export function renderToday(root, { query }) {
       food = findFood(m.foodId, m.source);
       units = food ? unitsFor(food) : [];
     }
+    // レシピの記録は、食材の内訳を見せる。記録時の内訳があればそれ。ない(過去の)記録は、現在のレシピから出す
+    let breakdown = null;
+    let fromCurrent = false;
+    if (isRecipe) {
+      if (Array.isArray(m.items) && m.items.length) breakdown = m.items;
+      else if (m.recipeId) {
+        try {
+          const r = await getRecipe(m.recipeId);
+          if (r?.items?.length) {
+            const p0 = parseFloat((m.qtyText || "").match(/^([\d.]+)人前$/)?.[1]);
+            const ratio = p0 > 0 && r.servings > 0 ? p0 / r.servings : 1;
+            breakdown = r.items.map((it) => ({ foodId: it.foodId, source: it.source, name: it.name, grams: Math.round(it.grams * ratio * 10) / 10 }));
+            fromCurrent = true;
+          }
+        } catch { /* 内訳が取れなくても、量の変更はできる */ }
+      }
+    }
     if (!alive || editingId !== m.id) return;
 
     // 栄養素は記録時点のスナップショットを量の比で増減する(あとで食材マスタを編集していても、過去の記録の前提は変えない)。
@@ -363,6 +380,7 @@ export function renderToday(root, { query }) {
         return {
           grams: Math.round(m.grams * ratio * 10) / 10, qtyText: `${q}人前`,
           nutrients: Object.fromEntries(Object.entries(m.nutrients || {}).filter(([, v]) => Number.isFinite(v)).map(([k, v]) => [k, Math.round(v * ratio * 100) / 100])),
+          ...(Array.isArray(m.items) ? { items: m.items.map((it) => ({ ...it, grams: Math.round(it.grams * ratio * 10) / 10 })) } : {}),
         };
       }
       const unit = unitSel.value === "g" ? null : units[Number(unitSel.value)];
@@ -388,7 +406,7 @@ export function renderToday(root, { query }) {
     saveBtn.addEventListener("click", () => {
       const r = compute();
       if (!r) return;
-      const before = { grams: m.grams, qtyText: m.qtyText || `${m.grams}g`, nutrients: m.nutrients || {} };
+      const before = { grams: m.grams, qtyText: m.qtyText || `${m.grams}g`, nutrients: m.nutrients || {}, items: m.items };
       updateMeal(m.id, r).catch(writeFailed(`${displayName(m)} の量の変更`));
       editingId = null;
       editPanel = null;
@@ -400,6 +418,12 @@ export function renderToday(root, { query }) {
     });
 
     panel.replaceChildren(
+      ...(breakdown
+        ? [el("div", { class: "breakdown" },
+          el("div", { class: "breakdown-title" }, "食材の内訳"),
+          el("ul", {}, breakdown.map((it) => el("li", {}, el("span", { class: "breakdown-name" }, displayName(it)), el("span", { class: "breakdown-g" }, `${Math.round(it.grams)}g`)))),
+          fromCurrent ? el("p", { class: "hint" }, "この記録には内訳がないため、現在のレシピをもとに表示しています。") : null)]
+        : []),
       el("div", { class: "row2" }, qty, ...(unitSel ? [unitSel] : [el("span", { class: "unit" }, "人前")])),
       preview,
       saveBtn,

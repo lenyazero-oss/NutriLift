@@ -212,6 +212,27 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 }
 .meal-tap .meal-name, .meal-tap .meal-sub { display: block; }
 .meal-edit { padding: 4px 0 12px; }
+/* レシピ一覧: 見出しの「⋯」メニュー、食材の1行表示 */
+.recipe-head { align-items: center; margin-bottom: 0; }
+.menu-btn { flex: none; min-width: 44px; min-height: 44px; font-size: 24px; line-height: 1; color: var(--text-sub); background: var(--surface-button); border: 1px solid var(--border); border-radius: 10px; }
+.menu-btn[aria-expanded="true"] { background: var(--divider); }
+.card-menu { display: flex; gap: 8px; margin: 2px 0 8px; }
+.card-menu[hidden] { display: none; }
+.menu-item {
+  flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; font: inherit; font-size: 15px;
+  color: var(--text); background: var(--surface-button); border: 1px solid var(--border); border-radius: 10px; text-decoration: none;
+}
+.menu-danger { color: var(--danger); margin-left: 16px; } /* 削除は、ほかのボタンから離す */
+.sort-segs { flex-wrap: wrap; }
+.sort-segs .seg { flex: 1 1 auto; font-size: 14px; padding: 0 8px; white-space: nowrap; }
+.recipe-items { margin: 2px 0 4px; font-size: 14px; color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 今日画面: レシピの記録の食材の内訳 */
+.breakdown { margin-bottom: 10px; }
+.breakdown-title { font-size: 13px; color: var(--text-sub); margin-bottom: 2px; }
+.breakdown ul { list-style: none; margin: 0; padding: 0; }
+.breakdown li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; font-size: 15px; border-top: 1px solid var(--divider); }
+.breakdown-name { min-width: 0; overflow-wrap: anywhere; }
+.breakdown-g { flex: none; color: var(--text-sub); font-variant-numeric: tabular-nums; }
 .edit-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 16px; } /* 保存ボタンから離して、誤タップを防ぐ */
 /* 編集フォームの「閉じる」「この記録を削除」は控えめな文字リンクにする(大きなボタンにしない) */
 .edit-actions .btn { width: auto; min-height: 40px; padding: 0 10px; font-size: 14px; font-weight: 400; }

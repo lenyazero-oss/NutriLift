@@ -10,6 +10,9 @@ import { renderFoodMaster } from "./views/foodmaster.js";
 import { renderFoodEdit } from "./views/foodedit.js";
 import { renderGoals } from "./views/goals.js";
 import { renderBackup } from "./views/backup.js";
+import { renderMealTimes } from "./views/mealtimes.js";
+import { getMealTimes } from "./db.js";
+import { setSlotTimes } from "./util.js";
 import { renderLogin } from "./views/login.js";
 import { renderAdd } from "./views/add.js";
 import { el, hideToast } from "./ui.js";
@@ -29,6 +32,7 @@ registerRoute("foodmaster", { tab: "settings", render: renderFoodMaster });
 registerRoute("foodedit", { tab: "settings", render: renderFoodEdit });
 registerRoute("goals", { tab: "settings", render: renderGoals });
 registerRoute("backup", { tab: "settings", render: renderBackup });
+registerRoute("mealtimes", { tab: "settings", render: renderMealTimes });
 
 function showScreen(name) {
   $("splash").hidden = name !== "splash";
@@ -52,11 +56,19 @@ function handleAuthChange(user) {
     if (user.uid === currentUid) return;
     resetUserCache();
     currentUid = user.uid;
-    showScreen("app");
-    setRouterEnabled(true);
-    render();
+    // 食事区分の時間帯(設定)を読んでから最初の画面を描く(画面の初期値を、設定どおりの区分にするため)。
+    // 読めなくても、1.5秒待ったら初期値のまま始める。読み込み中にユーザーが変わったら捨てる
+    const uid = user.uid;
+    const timesLoaded = getMealTimes().then((t) => { if (currentUid === uid) setSlotTimes(t); }).catch(() => {});
+    Promise.race([timesLoaded, new Promise((resolve) => setTimeout(resolve, 1500))]).then(() => {
+      if (currentUid !== uid) return;
+      showScreen("app");
+      setRouterEnabled(true);
+      render();
+    });
   } else {
     currentUid = null;
+    setSlotTimes(null); // 前ユーザーの設定を引き継がない
     resetUserCache();
     setRouterEnabled(false);
     hideToast();

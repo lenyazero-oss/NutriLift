@@ -21,6 +21,7 @@ export const COLLECTIONS = [
 export const SINGLES = [
   { key: "goals", label: "目標値" },
   { key: "profile", label: "身体情報" },
+  { key: "mealTimes", label: "食事区分の時間帯", optional: true },
 ];
 
 // ---- Timestamp の変換 ----
@@ -65,7 +66,7 @@ const GOAL_KEYS = NUTRIENTS.map((n) => n.key);
 // 問題があれば理由を、なければ空文字を返す
 const VALIDATORS = {
   meals(d) {
-    if (!keysOk(d, ["date", "slot", "foodId", "source", "recipeId", "name", "grams", "qtyText", "nutrients", "createdAt"],
+    if (!keysOk(d, ["date", "slot", "foodId", "source", "recipeId", "name", "grams", "qtyText", "nutrients", "items", "createdAt"],
       ["date", "slot", "source", "name", "grams", "qtyText", "nutrients"])) return "項目が不足しているか、余分な項目があります";
     if (typeof d.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return "日付の形式が正しくありません";
     if (!["morning", "noon", "night", "snack"].includes(d.slot)) return "食事区分が正しくありません";
@@ -76,6 +77,7 @@ const VALIDATORS = {
     if (!num(d.grams, 0, 1e9)) return "グラム数が正しくありません";
     if (typeof d.qtyText !== "string" || d.qtyText.length > 100) return "数量の表記が正しくありません";
     if (!numMap(d.nutrients, 30)) return "栄養素が正しくありません";
+    if ("items" in d && !(Array.isArray(d.items) && d.items.length <= 200 && d.items.every((x) => isObj(x) && str(x.name, 200) && num(x.grams, 0, 1e9)))) return "内訳が正しくありません";
     if (!optTs(d, "createdAt")) return "作成日時が正しくありません";
     return "";
   },
@@ -119,6 +121,13 @@ const VALIDATORS = {
   goals(d) {
     if (!keysOk(d, [...GOAL_KEYS, "updatedAt"], [])) return "余分な項目があります";
     if (!GOAL_KEYS.every((k) => !(k in d) || num(d[k], 0, 99999))) return "目標値が正しくありません";
+    if (!optTs(d, "updatedAt")) return "日時が正しくありません";
+    return "";
+  },
+  mealTimes(d) {
+    if (!keysOk(d, ["morningEnd", "noonEnd", "snackEnd", "updatedAt"], ["morningEnd", "noonEnd", "snackEnd"])) return "項目が不足しているか、余分な項目があります";
+    const { morningEnd: a, noonEnd: b, snackEnd: c } = d;
+    if (![a, b, c].every((h) => Number.isInteger(h) && h >= 1 && h <= 23) || !(a < b && b < c)) return "時刻が正しくありません";
     if (!optTs(d, "updatedAt")) return "日時が正しくありません";
     return "";
   },

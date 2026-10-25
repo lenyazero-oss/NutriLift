@@ -23,10 +23,25 @@ export function isValidDate(str) {
 }
 
 // 時刻から食事区分を推定(〜10時=朝、〜15時=昼、〜17時=間食、以降=夜)
-export function guessSlot(d = new Date()) {
+// 食事区分の自動判定の境目(「何時まで」)。設定(settings/mealTimes)で変えられる。初期値は 朝〜10時・昼〜15時・間食〜17時・それ以外は夜
+export const DEFAULT_SLOT_TIMES = { morningEnd: 10, noonEnd: 15, snackEnd: 17 };
+let slotTimes = { ...DEFAULT_SLOT_TIMES };
+
+// 1〜23の整数で、朝 < 昼 < 間食 の順か
+export function validSlotTimes(t) {
+  return !!t && [t.morningEnd, t.noonEnd, t.snackEnd].every((h) => Number.isInteger(h) && h >= 1 && h <= 23)
+    && t.morningEnd < t.noonEnd && t.noonEnd < t.snackEnd;
+}
+export function setSlotTimes(t) {
+  slotTimes = validSlotTimes(t) ? { morningEnd: t.morningEnd, noonEnd: t.noonEnd, snackEnd: t.snackEnd } : { ...DEFAULT_SLOT_TIMES };
+}
+export const getSlotTimes = () => ({ ...slotTimes });
+
+// 時刻から食事区分を決める。times を渡すと、その境目で判定する(設定画面の例の表示用)
+export function guessSlot(d = new Date(), times = slotTimes) {
   const h = d.getHours();
-  if (h < 10) return "morning";
-  if (h < 15) return "noon";
-  if (h < 17) return "snack";
+  if (h < times.morningEnd) return "morning";
+  if (h < times.noonEnd) return "noon";
+  if (h < times.snackEnd) return "snack";
   return "night";
 }
