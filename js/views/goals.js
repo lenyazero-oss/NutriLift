@@ -81,7 +81,10 @@ export function renderGoals(root) {
     const segField = (label, options, key) => {
       const btns = options.map((o) => {
         const b = el("button", { type: "button", class: "seg" }, o.label);
-        b.addEventListener("click", () => { profile[key] = o.key; paint(); hideResult(); });
+        b.addEventListener("click", () => {
+          if (profile[key] === o.key) return; // 同じ選択の再タップでは再計算を求めない
+          profile[key] = o.key; paint(); hideResult();
+        });
         return { b, o };
       });
       const paint = () => btns.forEach(({ b, o }) => {
@@ -96,12 +99,21 @@ export function renderGoals(root) {
     activitySelect.addEventListener("change", () => { profile.activity = activitySelect.value; hideResult(); });
 
     const calcError = el("p", { class: "error", role: "alert", hidden: true });
-    const result = el("div", { class: "calc-result", hidden: true, "aria-live": "polite" });
+    const result = el("div", { class: "calc-result", hidden: true });
     let proposal = null;
+    let staleNote = null;
+    // 入力が変わったら、結果は消さずに薄くして再計算を促す(消すと画面の高さが変わって操作が乱れる)。
+    // 古い提案を反映してしまわないよう、反映ボタンは使えなくする。
     function hideResult() {
-      proposal = null;
-      result.hidden = true;
       calcError.hidden = true;
+      if (!proposal) return;
+      proposal = null;
+      result.classList.add("stale");
+      result.querySelectorAll(".preview-n, .hint").forEach((n) => n.setAttribute("aria-hidden", "true")); // 古い値を読み上げない
+      staleNote.textContent = "入力が変わりました。もう一度「目標値を計算する」を押してください。";
+      applyBtn.classList.remove("btn-done");
+      applyBtn.disabled = true;
+      applyBtn.textContent = "再計算すると反映できます";
     }
     const calcBtn = el("button", { type: "button", class: "btn" }, "目標値を計算する");
     calcBtn.addEventListener("click", () => {
@@ -116,18 +128,24 @@ export function renderGoals(root) {
       // 現在の入力欄の値 → 提案値(反映するか判断しやすいよう差を見せる)
       const current = (key) => inputs.find((x) => x.def.key === key)?.input.value || "—";
       applyBtn = el("button", { type: "button", class: "btn", onclick: applyProposal }, "目標欄に反映する(未保存)");
+      // 入力が変わったときだけ文言が入る(role=status なので、入ったときに読み上げられる)。先頭に置いて見つけやすくする
+      staleNote = el("p", { class: "stale-note", role: "status" });
       result.replaceChildren(
+        staleNote,
         el("div", { class: "preview-n" }, defs.map((d) => el("span", {}, `${d.label} ${current(d.key)} → ${proposal[d.key]}${d.unit}`))),
-        el("p", { class: "hint" }, "目安です。体の変化を見ながら、目標欄で調整してください。"),
+        el("p", { class: "hint" }, "目安です。体の変化を見ながら、目標欄で調整してください。(たんぱく質は体重換算で、エネルギーの40%までにしています)"),
         applyBtn);
+      result.classList.remove("stale");
       result.hidden = false;
     });
     let applyBtn = null;
     const goalCard = el("section", { class: "card" });
     function applyProposal() {
-      if (!proposal) return;
+      if (!proposal || applyBtn.classList.contains("btn-done")) return;
       inputs.forEach(({ def, input }) => { if (def.key in proposal) input.value = String(proposal[def.key]); });
-      applyBtn.disabled = true;
+      // 反映済みは disabled にせず(薄く読みにくくなるため)、見た目で示して再タップを無効にする
+      applyBtn.classList.add("btn-done");
+      applyBtn.setAttribute("aria-disabled", "true");
       applyBtn.textContent = "反映しました。「保存する」で確定";
       goalCard.scrollIntoView({ block: "start", behavior: "smooth" }); // 変わった入力欄を見せる
       toast("目標欄に反映しました。保存するには「保存する」を押してください");

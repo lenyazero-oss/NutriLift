@@ -109,6 +109,10 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 .grid3 input { padding: 10px 8px; }
 .lbl select { margin-top: 4px; color: var(--text); }
 .calc-result { margin-top: 12px; }
+.calc-result.stale .preview-n { opacity: 0.6; }
+.stale-note { color: var(--warn-text); font-size: 14px; font-weight: 700; margin: 0 0 8px; padding-left: 8px; border-left: 3px solid var(--warn-text); }
+.stale-note:empty { display: none; }
+.btn-done, .btn-done:disabled { background: transparent; border-color: var(--accent); color: var(--accent); font-weight: 700; opacity: 1; }
 .calc-result .preview-n { font-size: 16px; color: var(--text); margin-bottom: 8px; }
 .preview-n { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; color: var(--muted); }
 

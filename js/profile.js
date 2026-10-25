@@ -22,6 +22,9 @@ export const AIMS = [
 export const DEFAULT_PROFILE = { sex: "male", age: 30, height: 170, weight: 65, activity: "mid", aim: "bulk" };
 
 const FAT_RATIO = 0.25; // 脂質はエネルギーの25%
+// たんぱく質はエネルギーの40%まで。食事摂取基準の目標量(20%台まで)より高いが、筋トレ・減量時の
+// 体重換算(2.0〜2.2g/kg)を尊重しつつ、極端な体格で他の栄養素を圧迫しないための頭打ち。
+const MAX_PROTEIN_RATIO = 0.4;
 const MIN_KCAL = 1200;
 
 // 入力が不正なら理由を、問題なければ空文字を返す
@@ -44,7 +47,8 @@ export function calcGoals(p) {
   const factor = ACTIVITIES.find((a) => a.key === p.activity).factor;
   const aim = AIMS.find((a) => a.key === p.aim);
   const kcal = Math.max(MIN_KCAL, Math.round((bmr * factor + aim.kcal) / 10) * 10);
-  const protein = Math.round(p.weight * aim.proteinPerKg);
+  // 体重換算のたんぱく質が、エネルギーに対して大きすぎる場合だけ上限をかける
+  const protein = Math.min(Math.round(p.weight * aim.proteinPerKg), Math.round((kcal * MAX_PROTEIN_RATIO) / 4));
   const fat = Math.round((kcal * FAT_RATIO) / 9);
   const carb = Math.max(1, Math.round((kcal - protein * 4 - fat * 9) / 4)); // 残りを炭水化物に
   return { kcal, protein, fat, carb, fiber: fiberFor(p.sex, p.age) };
