@@ -50,6 +50,17 @@ input, select, textarea {
   background: var(--surface-input);
   color: var(--text);
 }
+/* iOS Safari の日付欄は標準の見た目だと枠からはみ出すため、幅を枠内に収める */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+  line-height: 1.5;
+}
+input[type="date"]::-webkit-date-and-time-value { text-align: left; min-width: 0; min-height: 1.5em; }
 .btn {
   display: block;
   width: 100%;
@@ -92,6 +103,13 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 .row2 select { flex: 1.4; min-width: 0; }
 .preview { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
 .preview-g { font-size: 20px; font-weight: 700; }
+.calc-card summary { font-size: 18px; font-weight: 700; min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.calc-card[open] summary { margin-bottom: 4px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.grid3 input { padding: 10px 8px; }
+.lbl select { margin-top: 4px; color: var(--text); }
+.calc-result { margin-top: 12px; }
+.calc-result .preview-n { font-size: 16px; color: var(--text); margin-bottom: 8px; }
 .preview-n { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; color: var(--muted); }
 
 /* 今日の画面 */

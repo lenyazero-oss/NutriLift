@@ -1,8 +1,9 @@
 // 目標値の編集(#/goals)。未設定の項目は初期値で補われる。
 import { el, toast, writeFailed } from "../ui.js";
-import { getGoals, saveGoals, deleteGoals } from "../db.js";
+import { getGoals, saveGoals, deleteGoals, getProfile, saveProfile } from "../db.js";
 import { navigate } from "../router.js";
 import { shownNutrients, DEFAULT_GOALS, AT_LEAST } from "../nutrients.js";
+import { SEXES, ACTIVITIES, AIMS, DEFAULT_PROFILE, validateProfile, calcGoals } from "../profile.js";
 
 const MAX_GOAL = 99999;
 
@@ -12,11 +13,14 @@ export function renderGoals(root) {
   root.append(back, el("h1", {}, "目標値"), el("p", { class: "hint" }, "読み込み中…"));
 
   // 読み込めなくても初期値で編集できる(保存はオフラインでも復帰後に反映される)
-  getGoals(DEFAULT_GOALS)
-    .then((goals) => alive && start(goals, false))
-    .catch(() => alive && start({ ...DEFAULT_GOALS }, true));
+  // 身体情報が読めなくても目標値の編集は続けられる(入力欄は初期値になる)
+  // 両方そろってから1回だけ描画する(待っている間に画面を離れたら描画しない)
+  Promise.all([
+    getGoals(DEFAULT_GOALS).then((goals) => ({ goals, failed: false }), () => ({ goals: { ...DEFAULT_GOALS }, failed: true })),
+    getProfile().catch(() => null),
+  ]).then(([{ goals, failed }, savedProfile]) => { if (alive) start(goals, failed, savedProfile); });
 
-  function start(goals, loadFailed) {
+  function start(goals, loadFailed, savedProfile) {
     const defs = shownNutrients().filter((d) => d.key in DEFAULT_GOALS);
     const inputs = defs.map((d) => {
       const input = el("input", {
@@ -62,20 +66,100 @@ export function renderGoals(root) {
       }
     });
 
-    // 未保存の変更があるまま離れようとしたら確認する
+    // 身体情報から目標値の目安を計算するカード。結果は「反映」を押すまで下の入力欄に入らない。
+    const profile = { ...DEFAULT_PROFILE, ...(savedProfile || {}) };
+    const numField = (key, label, unit, step, inputmode = "decimal") => {
+      const input = el("input", {
+        type: "number", inputmode, step, value: String(profile[key]), "aria-label": `${label}(${unit})`,
+      });
+      input.addEventListener("focus", () => input.select());
+      input.addEventListener("input", () => { profile[key] = parseFloat(input.value); hideResult(); });
+      return el("label", { class: "lbl" }, `${label}(${unit})`, input);
+    };
+    const segField = (label, options, key) => {
+      const btns = options.map((o) => {
+        const b = el("button", { type: "button", class: "seg" }, o.label);
+        b.addEventListener("click", () => { profile[key] = o.key; paint(); hideResult(); });
+        return { b, o };
+      });
+      const paint = () => btns.forEach(({ b, o }) => {
+        b.classList.toggle("on", profile[key] === o.key);
+        b.setAttribute("aria-pressed", String(profile[key] === o.key));
+      });
+      paint();
+      return el("div", { class: "lbl" }, label, el("div", { class: "segs", role: "group", "aria-label": label }, btns.map((x) => x.b)));
+    };
+    const activitySelect = el("select", { "aria-label": "活動量" },
+      ACTIVITIES.map((a) => el("option", { value: a.key, selected: a.key === profile.activity }, a.label)));
+    activitySelect.addEventListener("change", () => { profile.activity = activitySelect.value; hideResult(); });
+
+    const calcError = el("p", { class: "error", role: "alert", hidden: true });
+    const result = el("div", { class: "calc-result", hidden: true, "aria-live": "polite" });
+    let proposal = null;
+    function hideResult() {
+      proposal = null;
+      result.hidden = true;
+      calcError.hidden = true;
+    }
+    const calcBtn = el("button", { type: "button", class: "btn" }, "目標値を計算する");
+    calcBtn.addEventListener("click", () => {
+      const msg = validateProfile(profile);
+      calcError.textContent = msg;
+      calcError.hidden = !msg;
+      if (msg) { calcError.scrollIntoView({ block: "center" }); return; }
+      proposal = calcGoals(profile);
+      // 次回から入力不要にする(失敗しても計算結果は使える)
+      const { sex, age, height, weight, activity, aim } = profile;
+      try { saveProfile({ sex, age, height, weight, activity, aim }).catch(writeFailed("身体情報")); } catch { /* 未ログインなど。計算は続ける */ }
+      // 現在の入力欄の値 → 提案値(反映するか判断しやすいよう差を見せる)
+      const current = (key) => inputs.find((x) => x.def.key === key)?.input.value || "—";
+      applyBtn = el("button", { type: "button", class: "btn", onclick: applyProposal }, "目標欄に反映する(未保存)");
+      result.replaceChildren(
+        el("div", { class: "preview-n" }, defs.map((d) => el("span", {}, `${d.label} ${current(d.key)} → ${proposal[d.key]}${d.unit}`))),
+        el("p", { class: "hint" }, "目安です。体の変化を見ながら、目標欄で調整してください。"),
+        applyBtn);
+      result.hidden = false;
+    });
+    let applyBtn = null;
+    const goalCard = el("section", { class: "card" });
+    function applyProposal() {
+      if (!proposal) return;
+      inputs.forEach(({ def, input }) => { if (def.key in proposal) input.value = String(proposal[def.key]); });
+      dirty = true;
+      applyBtn.disabled = true;
+      applyBtn.textContent = "反映しました。「保存する」で確定";
+      goalCard.scrollIntoView({ block: "start", behavior: "smooth" }); // 変わった入力欄を見せる
+      toast("目標欄に反映しました。保存するには「保存する」を押してください");
+    }
+
+    // 未保存の変更があるまま離れようとしたら確認する(身体情報の入力は対象外)
     let dirty = false;
-    root.addEventListener("input", () => (dirty = true));
+    root.addEventListener("input", (e) => { if (!e.target.closest(".calc-card")) dirty = true; });
     back.addEventListener("click", (e) => {
       if (dirty && !confirm("変更を破棄して戻りますか?")) e.preventDefault();
     });
+
+    goalCard.append(
+      el("p", { class: "hint" }, `1日の目標です。${defs.filter((d) => AT_LEAST.has(d.key)).map((d) => d.label).join("と")}は「目標以上」、ほかは「目標以内」を達成として扱います。`),
+      ...inputs.map(({ def, input }) => el("label", { class: "lbl" }, `${def.label}(${def.unit})`, input)));
 
     root.replaceChildren(
       back,
       el("h1", {}, "目標値"),
       ...(loadFailed ? [el("p", { class: "error", role: "alert" }, "保存済みの目標値を読み込めなかったため、初期値を表示しています。保存すると上書きされます。")] : []),
-      el("section", { class: "card" },
-        el("p", { class: "hint" }, `1日の目標です。${defs.filter((d) => AT_LEAST.has(d.key)).map((d) => d.label).join("と")}は「目標以上」、ほかは「目標以内」を達成として扱います。`),
-        ...inputs.map(({ def, input }) => el("label", { class: "lbl" }, `${def.label}(${def.unit})`, input))),
+      // たまにしか使わないので折りたたむ(身体情報が未保存の初回だけ開く)
+      el("details", { class: "card calc-card", open: !savedProfile },
+        el("summary", {}, "身体情報から目標を計算"),
+        el("p", { class: "hint" }, "年齢・身長・体重などから、1日の目標の目安を出します(18歳以上向け)。入力した内容は次回のために保存されます。"),
+        segField("性別", SEXES, "sex"),
+        el("div", { class: "grid3" },
+          numField("age", "年齢", "歳", "1", "numeric"),
+          numField("height", "身長", "cm", "any"),
+          numField("weight", "体重", "kg", "any")),
+        el("label", { class: "lbl" }, "活動量", activitySelect),
+        segField("目的", AIMS, "aim"),
+        calcError, calcBtn, result),
+      goalCard,
       error, saveBtn,
       el("button", {
         type: "button", class: "btn btn-link center reset-link",

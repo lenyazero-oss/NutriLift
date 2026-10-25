@@ -76,6 +76,17 @@ service cloud.firestore {
         && d.get('updatedAt', request.time) is timestamp;
     }
 
+    // 身体情報(目標値の自動計算用)
+    function validProfile(d) {
+      return d.keys().hasOnly(['sex', 'age', 'height', 'weight', 'activity', 'aim', 'updatedAt'])
+        && d.keys().hasAll(['sex', 'age', 'height', 'weight', 'activity', 'aim'])
+        && d.sex in ['male', 'female']
+        && d.activity in ['low', 'light', 'mid', 'high']
+        && d.aim in ['bulk', 'keep', 'cut']
+        && num(d.age, 1, 150) && num(d.height, 1, 300) && num(d.weight, 1, 500)
+        && d.get('updatedAt', request.time) is timestamp;
+    }
+
     // 本人(uid 一致)のみ users/{uid}/ 配下を読み書き可。書き込みは形式を検証し、削除は検証なし。
     match /users/{uid} {
       match /meals/{id} {
@@ -97,6 +108,10 @@ service cloud.firestore {
       match /settings/goals {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validGoals(request.resource.data);
+      }
+      match /settings/profile {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validProfile(request.resource.data);
       }
     }
     // それ以外はすべて拒否

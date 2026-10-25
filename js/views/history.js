@@ -125,7 +125,7 @@ export function renderHistory(root, { query }) {
         },
       }, d.label)));
 
-    chartBox.replaceChildren(
+    chartBox.replaceChildren(...[
       el("div", { class: "chart-sum" },
         el("div", {}, el("span", { class: "k" }, "記録した日の平均"), el("strong", {}, loaded && logged.length ? `${avg.toFixed(def.decimals)}${def.unit}` : "—")),
         el("div", {}, el("span", { class: "k" }, atLeast ? "目標以上の日" : "目標以内の日"), el("strong", {}, loaded && hasGoal ? `${achieved} / ${logged.length}日` : "—"))),
@@ -133,7 +133,8 @@ export function renderHistory(root, { query }) {
       // 色だけに頼らず、超過は文字でも示す(超過表示があるのは、たんぱく質以外で目標がある場合)
       hasGoal && !atLeast ? el("p", { class: "hint chart-note" }, "▲ は目標を超えた日です") : null,
       !loaded && !failed ? el("p", { class: "empty" }, "読み込み中…") : null,
-      loaded && !logged.length ? el("p", { class: "empty" }, "この週の記録はありません") : null);
+      loaded && !logged.length ? el("p", { class: "empty" }, "この週の記録はありません") : null,
+    ].filter(Boolean)); // replaceChildren は null を文字列「null」として表示してしまうため除く
 
     // 新しい日が上。記録のない日も、タップして追加できるよう表示する
     list.replaceChildren(

@@ -108,6 +108,17 @@ export async function deleteGoals() {
   return fs.deleteDoc(fs.doc(col("settings"), "goals"));
 }
 
+// 身体情報(目標値の自動計算に使う): { sex, age, height, weight, activity, aim }。未保存なら null。
+export async function getProfile() {
+  const snap = await fs.getDoc(fs.doc(col("settings"), "profile"));
+  return snap.exists() ? snap.data() : null;
+}
+
+// 呼び出し側は await せず、エラーだけ catch すること(オフライン時は応答が返らない)。
+export function saveProfile(profile) {
+  return fs.setDoc(fs.doc(col("settings"), "profile"), { ...profile, updatedAt: fs.serverTimestamp() });
+}
+
 export async function listCustomFoods() {
   const snap = await fs.getDocs(col("customFoods"));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));

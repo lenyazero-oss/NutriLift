@@ -99,10 +99,11 @@ export function renderAdd(root, { query }) {
     };
     const update = () => {
       const g = grams();
-      preview.replaceChildren(
+      preview.replaceChildren(...[
         el("div", { class: "preview-g" }, g > 0 ? `${Math.round(g * 10) / 10} g` : "量を入力してください"),
         g > 0 ? el("div", { class: "preview-n" },
-          shownNutrients().map((d) => el("span", {}, `${d.label} ${formatValue(d, scale(food.n, g)[d.key])}`))) : null);
+          shownNutrients().map((d) => el("span", {}, `${d.label} ${formatValue(d, scale(food.n, g)[d.key])}`))) : null,
+      ].filter(Boolean)); // null が「null」と表示されないように除く
       saveBtn.disabled = !(g > 0);
     };
     unitSel.addEventListener("change", () => {
