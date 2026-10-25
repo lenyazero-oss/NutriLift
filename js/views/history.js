@@ -10,7 +10,7 @@ const W = 320, H = 190, PAD = { l: 8, r: 8, t: 22, b: 34 };
 
 function parts(str) {
   const [y, m, d] = str.split("-").map(Number);
-  return { m, d, wd: WEEKDAYS[new Date(y, m - 1, d).getDay()] };
+  return { y, m, d, wd: WEEKDAYS[new Date(y, m - 1, d).getDay()] };
 }
 
 function svg(tag, attrs = {}, text) {
@@ -71,7 +71,9 @@ export function renderHistory(root, { query }) {
   let failed = false;
   let alive = true;
 
-  const label = (s) => { const p = parts(s); return `${p.m}/${p.d}`; };
+  // 年をまたぐ週だけ、年も表示する(例: 25/12/28 〜 26/1/3。320px幅で折り返さないよう2桁)
+  const crossesYear = parts(start).y !== parts(end).y;
+  const label = (s) => { const p = parts(s); return `${crossesYear ? `${String(p.y).slice(-2)}/` : ""}${p.m}/${p.d}`; };
   const isLatest = end >= today;
 
   const navLink = (target, text, aria, attrs = {}) => {
@@ -140,7 +142,7 @@ export function renderHistory(root, { query }) {
         const p = parts(d.date);
         return el("li", {},
           el("a", { class: "list-item day", href: `#/today?date=${d.date}` },
-            el("span", { class: "name" }, `${p.m}月${p.d}日(${p.wd})`, d.isToday ? el("span", { class: "chip" }, "今日") : null),
+            el("span", { class: "name" }, `${crossesYear ? `${p.y}年` : ""}${p.m}月${p.d}日(${p.wd})`, d.isToday ? el("span", { class: "chip" }, "今日") : null),
             el("span", { class: "meta" }, d.count
               ? `${Math.round(d.total.kcal || 0)}kcal ・ P ${(d.total.protein || 0).toFixed(1)}g ・ ${d.count}件`
               : "記録なし")));

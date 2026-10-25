@@ -163,8 +163,9 @@ h2 { font-size: 19px; margin: 0 0 10px; }
 .reset-link { margin-top: 32px; }
 
 /* 履歴 */
-.segs.wrap { flex-wrap: wrap; margin-bottom: 12px; }
-.segs.wrap .seg { flex: 1 1 30%; min-height: 44px; font-size: 15px; }
+/* 3列のグリッドにして、2行目のボタンも1行目と同じ幅にそろえる */
+.segs.wrap { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 12px; }
+.segs.wrap .seg { min-height: 44px; font-size: 15px; padding: 0 4px; }
 .datelabel.range { font-size: 18px; }
 .navbtn.disabled { opacity: 0.25; }
 .chart { width: 100%; height: auto; display: block; }
