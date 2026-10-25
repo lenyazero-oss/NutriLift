@@ -6,7 +6,7 @@ import { el, toast, writeFailed } from "../ui.js";
 import { loadFoods, findFood, unitsFor } from "../foods.js";
 import { ensureUserData, invalidateUserData } from "../food-picker.js";
 import { saveCustomFood, deleteCustomFood, saveUnitOverride, deleteUnitOverride } from "../db.js";
-import { navigate } from "../router.js";
+import { navigate, setLeaveGuard } from "../router.js";
 import { shownNutrients } from "../nutrients.js";
 
 const MAX_UNITS = 10;
@@ -102,10 +102,12 @@ export function renderFoodEdit(root, { args }) {
 
     const cleanUnits = () => units.map((u) => ({ name: u.name.trim(), g: Math.round(u.g * 10) / 10 }));
 
+    let leaving = false; // 保存・削除・初期値に戻すのあとは確認なしで移動する
     function finish(message, done, what, verb = "保存") {
       // オフライン時は応答が返らないため await しない
       done.catch(writeFailed(what, verb));
       invalidateUserData();
+      leaving = true;
       toast(message);
       navigate("#/foodmaster");
     }
@@ -134,14 +136,13 @@ export function renderFoodEdit(root, { args }) {
       }
     });
 
-    // 未保存の変更があるまま離れようとしたら確認する
-    let dirty = false;
-    root.addEventListener("input", () => (dirty = true));
-    addUnitBtn.addEventListener("click", () => (dirty = true));
-    unitList.addEventListener("click", () => (dirty = true));
-    back.addEventListener("click", (e) => {
-      if (dirty && !confirm("変更を破棄して戻りますか?")) e.preventDefault();
-    });
+    // 未保存の変更があるまま離れようとしたら確認する(戻るリンク・下部タブ・スワイプ戻りのどれでも)。
+    // 開いた時点の内容と比べるので、元に戻せば確認は出ない。
+    const snapshot = () => JSON.stringify([
+      nameInput.value.trim(), nutInputs.map(({ input }) => input.value.trim()), units.map((u) => [u.name.trim(), u.g]),
+    ]);
+    const initial = snapshot();
+    setLeaveGuard(() => leaving || snapshot() === initial || confirm("変更が保存されていません。保存せずに移動しますか?\n(OKを押すと入力した内容は破棄されます)"));
 
     const children = [back, el("h1", {}, isCustom ? (id ? "自作食材を編集" : "自作食材を作る") : food.name)];
     if (isCustom) {

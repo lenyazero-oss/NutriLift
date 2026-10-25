@@ -1,7 +1,7 @@
 // 目標値の編集(#/goals)。未設定の項目は初期値で補われる。
 import { el, toast, writeFailed } from "../ui.js";
 import { getGoals, saveGoals, deleteGoals, getProfile, saveProfile } from "../db.js";
-import { navigate } from "../router.js";
+import { navigate, setLeaveGuard } from "../router.js";
 import { shownNutrients, DEFAULT_GOALS, AT_LEAST } from "../nutrients.js";
 import { SEXES, ACTIVITIES, AIMS, DEFAULT_PROFILE, validateProfile, calcGoals } from "../profile.js";
 
@@ -44,8 +44,10 @@ export function renderGoals(root) {
     }
 
     // オフライン時は応答が返らないため await しない
+    let leaving = false; // 保存・初期値に戻すのあとは確認なしで移動する
     function finish(message, done, verb = "保存") {
       done.catch(writeFailed("目標値", verb));
+      leaving = true;
       toast(navigator.onLine === false ? `${message}(通信が回復したら反映されます)` : message);
       navigate("#/settings");
     }
@@ -125,19 +127,17 @@ export function renderGoals(root) {
     function applyProposal() {
       if (!proposal) return;
       inputs.forEach(({ def, input }) => { if (def.key in proposal) input.value = String(proposal[def.key]); });
-      dirty = true;
       applyBtn.disabled = true;
       applyBtn.textContent = "反映しました。「保存する」で確定";
       goalCard.scrollIntoView({ block: "start", behavior: "smooth" }); // 変わった入力欄を見せる
       toast("目標欄に反映しました。保存するには「保存する」を押してください");
     }
 
-    // 未保存の変更があるまま離れようとしたら確認する(身体情報の入力は対象外)
-    let dirty = false;
-    root.addEventListener("input", (e) => { if (!e.target.closest(".calc-card")) dirty = true; });
-    back.addEventListener("click", (e) => {
-      if (dirty && !confirm("変更を破棄して戻りますか?")) e.preventDefault();
-    });
+    // 未保存の変更があるまま離れようとしたら確認する(戻るリンク・下部タブ・スワイプ戻りのどれでも)。
+    // 目標欄だけを開いた時点と比べる(身体情報の入力は対象外)。
+    const snapshot = () => JSON.stringify(inputs.map(({ input }) => input.value.trim()));
+    const initial = snapshot();
+    setLeaveGuard(() => leaving || snapshot() === initial || confirm("変更が保存されていません。保存せずに移動しますか?\n(OKを押すと入力した内容は破棄されます)"));
 
     goalCard.append(
       el("p", { class: "hint" }, `1日の目標です。${defs.filter((d) => AT_LEAST.has(d.key)).map((d) => d.label).join("と")}は「目標以上」、ほかは「目標以内」を達成として扱います。`),
