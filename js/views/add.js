@@ -1,12 +1,13 @@
 // 食事追加: 食材検索 → グラム、または 単位×数量 → 記録
 import { el, toast, writeFailed } from "../ui.js";
-import { loadFoods, searchFoods, unitsFor, displayName, findFood } from "../foods.js";
+import { loadFoods, searchFoods, unitsFor, displayName, findFood, normalize } from "../foods.js";
 import { ensureUserData } from "../food-picker.js";
 import { recordUsage } from "../usage.js";
 import { createQuickFoods } from "../quick-foods.js";
-import { addMeal, deleteMeal } from "../db.js";
+import { addMeal, deleteMeal, watchRecipes } from "../db.js";
+import { recordRecipe, MAX_PORTIONS } from "./recipes.js";
 import { setRefreshBlocker } from "../router.js";
-import { shownNutrients, scale, formatValue } from "../nutrients.js";
+import { shownNutrients, scale, formatValue, recipePortion } from "../nutrients.js";
 import { SLOTS, dateStr, isValidDate, guessSlot } from "../util.js";
 
 export function renderAdd(root, { query }) {
@@ -51,6 +52,13 @@ export function renderAdd(root, { query }) {
   const results = el("ul", { class: "list" });
   const formArea = el("div");
 
+  // 検索に出す保存済みレシピ。取得できるまでは空(食材の検索だけ使える)
+  let recipes = [];
+  const unwatchRecipes = watchRecipes((list) => {
+    recipes = list;
+    if (search.value.trim() && !selected) showResults();
+  }, () => toast("レシピを読み込めませんでした(食材は検索できます)。", { error: true }));
+
   // 検索欄が空で食材も選んでいないときだけ、「最近」「よく使う」の食材を出す(直近60日の記録から集計。共通部品)
   const quick = createQuickFoods({ onPick: (food, lastQty) => select(food, lastQty) });
   const syncQuick = () => quick.setVisible(search.value.trim() === "" && selected === null);
@@ -67,10 +75,20 @@ export function renderAdd(root, { query }) {
     const q = search.value.trim();
     if (!q) return;
     const hits = searchFoods(q);
-    if (!hits.length) {
+    const nq = normalize(q);
+    const recipeHits = recipes.filter((r) => normalize(r.name).includes(nq));
+    if (!hits.length && !recipeHits.length) {
       results.append(el("li", { class: "empty" }, "見つかりませんでした"));
       return;
     }
+    recipeHits.forEach((r) => {
+      const one = recipePortion(r, 1).nutrients;
+      const btn = el("button", { type: "button", class: "list-item" },
+        el("span", { class: "name" }, el("span", { class: "chip" }, "レシピ"), " ", r.name),
+        el("span", { class: "meta" }, `1人前 たんぱく質 ${(one.protein || 0).toFixed(1)}g / ${Math.round(one.kcal || 0)}kcal`));
+      btn.addEventListener("click", () => selectRecipe(r));
+      results.append(el("li", {}, btn));
+    });
     hits.forEach((f) => {
       const btn = el("button", { type: "button", class: "list-item" },
         el("span", { class: "name" }, displayName(f)),
@@ -90,6 +108,53 @@ export function renderAdd(root, { query }) {
     search.blur(); // キーボードを閉じてから量の入力へ
     formArea.replaceChildren(buildForm(food, init));
     formArea.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  // レシピを選んだとき: 量は人前数。記録は「レシピ」画面と同じ処理(recordRecipe)
+  function selectRecipe(recipe) {
+    selected = recipe;
+    results.replaceChildren();
+    search.value = recipe.name;
+    syncQuick();
+    search.blur();
+    formArea.replaceChildren(buildRecipeForm(recipe));
+    formArea.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  function buildRecipeForm(recipe) {
+    const qty = el("input", { type: "number", inputmode: "decimal", min: "0", max: String(MAX_PORTIONS), step: "any", value: "1", "aria-label": "人前" });
+    const preview = el("div", { class: "preview", "aria-live": "polite" });
+    const saveBtn = el("button", { type: "button", class: "btn btn-big btn-primary" }, "記録する");
+    const portions = () => {
+      const q = parseFloat(qty.value);
+      return q > 0 && q <= MAX_PORTIONS ? q : 0;
+    };
+    const update = () => {
+      const p = portions();
+      const n = p > 0 ? recipePortion(recipe, p) : null;
+      preview.replaceChildren(...[
+        el("div", { class: n ? "preview-g" : "preview-g error" }, n ? `${p}人前(${n.grams} g)` : `人前は0より大きく${MAX_PORTIONS}以下で入力してください`),
+        n ? el("div", { class: "preview-n" },
+          shownNutrients().map((d) => el("span", {}, `${d.label} ${formatValue(d, n.nutrients[d.key])}`))) : null,
+      ].filter(Boolean));
+      saveBtn.disabled = !n;
+    };
+    qty.addEventListener("input", update);
+    qty.addEventListener("focus", () => qty.select());
+    saveBtn.addEventListener("click", () => {
+      const p = portions();
+      if (!(p > 0)) return;
+      recordRecipe(recipe, p, date, slot);
+      selected = null;
+      search.value = "";
+      formArea.replaceChildren();
+      syncQuick();
+    });
+    update();
+    return el("section", { class: "card" },
+      el("h2", {}, recipe.name),
+      el("div", { class: "row2" }, qty, el("span", { class: "lbl" }, "人前")),
+      preview, saveBtn);
   }
 
   function buildForm(food, init) {
@@ -231,4 +296,6 @@ export function renderAdd(root, { query }) {
     quick.refresh().then(syncQuick); // 自作食材も解決できるよう、ユーザーデータのあとに集計する
     preselect();
   })();
+
+  return unwatchRecipes; // 画面を離れるときにレシピの購読を解除する
 }

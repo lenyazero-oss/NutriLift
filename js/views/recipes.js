@@ -10,7 +10,7 @@ import { SLOTS, dateStr, guessSlot } from "../util.js";
 
 const slotLabel = (key) => SLOTS.find((s) => s.key === key)?.label ?? "";
 const round1 = (v) => Math.round(v * 10) / 10;
-const MAX_PORTIONS = 100; // 人前数の上限(巨大な値だと grams が firestore.rules の上限を超えて保存できない)
+export const MAX_PORTIONS = 100; // 人前数の上限(巨大な値だと grams が firestore.rules の上限を超えて保存できない)
 
 // 並び替え。最近使った順は、食事の記録(直近60日)から決める
 const SORTS = [
@@ -30,7 +30,7 @@ function itemsLine(recipe) {
 }
 
 // レシピの portions 人前を食事として記録する(記録時点の栄養素と、食材の内訳を保存)
-function recordRecipe(recipe, portions, date, slot) {
+export function recordRecipe(recipe, portions, date, slot) {
   const p = recipePortion(recipe, portions);
   const ratio = portions / (recipe.servings || 1);
   const meal = {
