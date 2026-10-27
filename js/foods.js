@@ -63,13 +63,67 @@ export function setUserData({ customFoods = [], unitOverrides = {}, names = {} }
 
 // 成分表の名前の「<鳥肉類>」のような分類と、先頭の「(かんきつ類)」を除いた名前。
 // 例: 「<鳥肉類> にわとり [若どり・主品目] もも 皮なし 生」→「にわとり [若どり・主品目] もも 皮なし 生」
-export function cleanName(name) {
+function stripCategory(name) {
   const cleaned = String(name)
     .replace(/[<＜][^>＞]*[>＞]/g, "")
     .replace(/^\s*[(（][^)）]*[)）]/, "")
     .replace(/\s+/g, " ")
     .trim();
   return cleaned || String(name); // 全部消えてしまう名前は元のまま
+}
+
+// 先頭の語(かな書きの学術名寄り)を、一般的な呼び名にする
+const HEAD_NAMES = {
+  にわとり: "鶏", うし: "牛", ぶた: "豚", めんよう: "羊", こめ: "米", こむぎ: "小麦", だいず: "大豆",
+  だいこん: "大根", たまねぎ: "玉ねぎ", ほうれんそう: "ほうれん草", こまつな: "小松菜", はくさい: "白菜",
+  しろさけ: "鮭", まいわし: "いわし", まさば: "さば", まあじ: "あじ", くろまぐろ: "まぐろ",
+};
+// [ ] の中身の言い換え。空文字は「消す」
+const BRACKET_NAMES = {
+  水稲穀粒: "", 水稲めし: "ご飯", 陸稲穀粒: "陸稲",陸稲めし: "ご飯(陸稲)",
+  "若どり・主品目": "若どり", "親・主品目": "親どり",
+  "若どり・副品目": "若どり", "親・副品目": "親どり", 二次品目: "", 副品目: "", その他: "",
+};
+
+// 成分表の名前を読みやすくした名前。
+// 例: 「<鳥肉類> にわとり [若どり・主品目] むね 皮なし 生」→「鶏 若どり むね 皮なし」
+//     「こむぎ [パン類] 角形食パン 食パン」→「角形食パン」 / 「こめ [水稲めし] 精白米 うるち米」→「ご飯 精白米 うるち米」
+// 元の名前は保存データに残り、検索は元の名前も使う。
+export function cleanName(name) {
+  const base = stripCategory(name);
+  const m = /^(\S+)\s+\[([^\]]*)\]\s*(.*)$/.exec(base);
+  if (!m) return tidy(base.split(" "), true); // [ ] のない名前(野菜・魚など)
+  const [, head, bracket, rest] = m;
+  const restTokens = rest.split(" ").filter(Boolean);
+  // 「パン類」「豆腐・油揚げ類」「その他」のような分類は消し、先頭の語も省く(「小麦 パン類 コッペパン」より「コッペパン」)
+  if (/類$/.test(bracket) || bracket === "その他") {
+    if (restTokens.length) return tidy(restTokens, false);
+  }
+  const b = bracket in BRACKET_NAMES ? BRACKET_NAMES[bracket] : bracket;
+  const dropHead = b.startsWith("ご飯");
+  return tidy([...(dropHead ? [] : [head]), b, ...restTokens], !dropHead);
+}
+
+// 語の並びを整える: 先頭を一般名に / 隣と同じか含まれる語を省く / 先頭の語が他の語に含まれるなら省く(「生」「焼き」などの調理状態は残す)
+function tidy(tokens, mapHead) {
+  let t = tokens.filter(Boolean);
+  if (mapHead && t.length && HEAD_NAMES[t[0]]) t[0] = HEAD_NAMES[t[0]];
+  t = t.filter((w, i) => !(i > 0 && (t[i - 1] === w || (w.length >= 2 && t[i - 1].includes(w)))));
+  if (t.length > 1 && t.slice(1).some((w) => w !== t[0] && w.includes(t[0]))) t.shift();
+  return t.join(" ") || tokens.join(" ");
+}
+
+// 検索結果などに添える分類(「鳥肉類」「だいこん類」)。なければ空文字
+export function categoryOf(food) {
+  if (food.source !== "table") return "";
+  const m = /[<＜]([^>＞]*)[>＞]/.exec(food.name) ?? /^\s*[(（]([^)）]*)[)）]/.exec(food.name);
+  return m && m[1] !== "その他" ? m[1] : "";
+}
+
+// 食材の2行目に出す説明: 「(自作 ・ )(分類 ・ )たんぱく質 ◯g / ◯kcal(100g)」
+export function foodMeta(f) {
+  const lead = f.source === "custom" ? "自作 ・ " : categoryOf(f) ? `${categoryOf(f)} ・ ` : "";
+  return `${lead}たんぱく質 ${(f.n?.protein ?? 0).toFixed(1)}g / ${Math.round(f.n?.kcal ?? 0)}kcal(100g)`;
 }
 
 // 画面に出す名前。ユーザーが設定した表示名 > 整形した名前(元の名前は保存データに残る)。

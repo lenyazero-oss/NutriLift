@@ -1,6 +1,6 @@
 // 食事追加: 食材検索 → グラム、または 単位×数量 → 記録
 import { el, toast, writeFailed } from "../ui.js";
-import { loadFoods, searchFoods, unitsFor, displayName, findFood, normalize } from "../foods.js";
+import { loadFoods, searchFoods, unitsFor, displayName, findFood, normalize, foodMeta } from "../foods.js";
 import { ensureUserData } from "../food-picker.js";
 import { recordUsage } from "../usage.js";
 import { createQuickFoods } from "../quick-foods.js";
@@ -92,8 +92,7 @@ export function renderAdd(root, { query }) {
     hits.forEach((f) => {
       const btn = el("button", { type: "button", class: "list-item" },
         el("span", { class: "name" }, displayName(f)),
-        el("span", { class: "meta" },
-          `${f.source === "custom" ? "自作 ・ " : ""}たんぱく質 ${(f.n.protein ?? 0).toFixed(1)}g / ${Math.round(f.n.kcal ?? 0)}kcal(100g)`));
+        el("span", { class: "meta" }, foodMeta(f)));
       btn.addEventListener("click", () => select(f));
       results.append(el("li", {}, btn));
     });

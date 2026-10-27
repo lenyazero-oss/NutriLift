@@ -1,6 +1,6 @@
 // 食材検索ピッカー(レシピ編集などで使う)。検索して選んだ食材を onPick に渡す。
 import { el } from "./ui.js";
-import { loadFoods, setUserData, searchFoods, displayName } from "./foods.js";
+import { loadFoods, setUserData, searchFoods, displayName, foodMeta } from "./foods.js";
 import { listCustomFoods, getUnitOverrides, getDisplayNames } from "./db.js";
 import { createQuickFoods } from "./quick-foods.js";
 
@@ -56,8 +56,7 @@ export function createFoodPicker({ onPick, placeholder = "食材名で検索(例
     hits.forEach((f) => {
       const btn = el("button", { type: "button", class: "list-item" },
         el("span", { class: "name" }, displayName(f)),
-        el("span", { class: "meta" },
-          `${f.source === "custom" ? "自作 ・ " : ""}たんぱく質 ${(f.n.protein ?? 0).toFixed(1)}g / ${Math.round(f.n.kcal ?? 0)}kcal(100g)`));
+        el("span", { class: "meta" }, foodMeta(f)));
       btn.addEventListener("click", () => pick(f));
       results.append(el("li", {}, btn));
     });
